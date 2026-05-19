@@ -96,11 +96,24 @@ export function mergeTickets(primaryId: string, secondaryId: string): Promise<Ti
 }
 
 // --- Agent ---
+export interface AgentHistoryEntry {
+  role: string;
+  content?: string;
+  tool_calls?: unknown[];
+  tool_call_id?: string;
+}
+
+export interface AgentPendingAction {
+  name: string;
+  args: Record<string, unknown>;
+  tool_call_id: string;
+}
+
 export async function sendAgentMessage(
   message: string,
-  history: object[],
-  confirmedAction?: object | null
-): Promise<{ reply: string; pending_action: object | null; updated_history: object[] }> {
+  history: AgentHistoryEntry[],
+  confirmedAction?: AgentPendingAction | null
+): Promise<{ reply: string; pending_action: AgentPendingAction | null; updated_history: AgentHistoryEntry[] }> {
   const res = await fetch(`${BASE}/agent/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

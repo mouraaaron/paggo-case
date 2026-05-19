@@ -4,16 +4,32 @@ import { useState, useRef, useEffect, KeyboardEvent } from 'react'
 import { sendAgentMessage } from '@/lib/api'
 
 interface DisplayMessage {
-  role: 'user' | 'assistant'
-  content: string
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+interface PendingAction {
+  name: string;
+  args: Record<string, unknown>;
+  tool_call_id: string;
+}
+
+interface HistoryEntry {
+  role: string;
+  content?: string;
+  tool_calls?: unknown[];
+  tool_call_id?: string;
 }
 
 export default function AgentChat() {
+  const CONFIRM_SIGNAL = ''; // backend ignores message when confirmed_action is set
+
   const [messages, setMessages] = useState<DisplayMessage[]>([])
-  const [history, setHistory] = useState<object[]>([])
+  const [history, setHistory] = useState<HistoryEntry[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [pendingAction, setPendingAction] = useState<object | null>(null)
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -24,21 +40,22 @@ export default function AgentChat() {
     const text = input.trim()
     if (!text || loading) return
 
-    setMessages(prev => [...prev, { role: 'user', content: text }])
+    const newMsg: DisplayMessage = { id: crypto.randomUUID(), role: 'user', content: text }
+    setMessages(prev => [...prev, newMsg])
     setInput('')
     setLoading(true)
 
     try {
       const res = await sendAgentMessage(text, history, null)
-      setHistory(res.updated_history)
-      setMessages(prev => [...prev, { role: 'assistant', content: res.reply }])
+      setHistory(res.updated_history as HistoryEntry[])
+      setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'assistant', content: res.reply }])
       if (res.pending_action) {
-        setPendingAction(res.pending_action)
+        setPendingAction(res.pending_action as PendingAction)
       }
     } catch (err) {
       setMessages(prev => [
         ...prev,
-        { role: 'assistant', content: `Error: ${err instanceof Error ? err.message : 'Unknown error'}` },
+        { id: crypto.randomUUID(), role: 'assistant', content: `Error: ${err instanceof Error ? err.message : 'Unknown error'}` },
       ])
     } finally {
       setLoading(false)
@@ -49,19 +66,20 @@ export default function AgentChat() {
     if (!pendingAction || loading) return
     setLoading(true)
     const actionToConfirm = pendingAction
+    // Cleared optimistically before await; loading=true above prevents cancel race.
     setPendingAction(null)
 
     try {
-      const res = await sendAgentMessage('', history, actionToConfirm)
-      setHistory(res.updated_history)
-      setMessages(prev => [...prev, { role: 'assistant', content: res.reply }])
+      const res = await sendAgentMessage(CONFIRM_SIGNAL, history, actionToConfirm)
+      setHistory(res.updated_history as HistoryEntry[])
+      setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'assistant', content: res.reply }])
       if (res.pending_action) {
-        setPendingAction(res.pending_action)
+        setPendingAction(res.pending_action as PendingAction)
       }
     } catch (err) {
       setMessages(prev => [
         ...prev,
-        { role: 'assistant', content: `Error: ${err instanceof Error ? err.message : 'Unknown error'}` },
+        { id: crypto.randomUUID(), role: 'assistant', content: `Error: ${err instanceof Error ? err.message : 'Unknown error'}` },
       ])
     } finally {
       setLoading(false)
@@ -69,8 +87,9 @@ export default function AgentChat() {
   }
 
   function handleCancel() {
+    if (loading) return;
     setPendingAction(null)
-    setMessages(prev => [...prev, { role: 'assistant', content: 'Action cancelled.' }])
+    setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'assistant', content: 'Action cancelled.' }])
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
@@ -79,8 +98,6 @@ export default function AgentChat() {
       handleSend()
     }
   }
-
-  const pendingActionObj = pendingAction as { name?: string; args?: Record<string, unknown> } | null
 
   return (
     <div className="flex flex-col h-full">
@@ -97,9 +114,9 @@ export default function AgentChat() {
             Start a conversation with the AI Triage Assistant.
           </p>
         )}
-        {messages.map((msg, i) => (
+        {messages.map((msg) => (
           <div
-            key={i}
+            key={msg.id}
             className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
@@ -128,11 +145,11 @@ export default function AgentChat() {
         <div className="flex-shrink-0 bg-amber-50 border-t border-amber-200 px-4 py-3">
           <p className="text-sm font-medium text-amber-800 mb-1">
             Agent wants to:{' '}
-            <span className="font-semibold">{pendingActionObj?.name ?? 'unknown action'}</span>
+            <span className="font-semibold">{pendingAction.name ?? 'unknown action'}</span>
           </p>
-          {pendingActionObj?.args && (
+          {pendingAction.args && (
             <pre className="text-xs text-amber-700 bg-amber-100 rounded p-2 mb-2 overflow-x-auto">
-              {JSON.stringify(pendingActionObj.args, null, 2)}
+              {JSON.stringify(pendingAction.args, null, 2)}
             </pre>
           )}
           <div className="flex gap-2">
