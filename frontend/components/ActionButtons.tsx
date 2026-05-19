@@ -8,6 +8,7 @@ import {
   assignTicket,
   addReply,
   closeTicket,
+  getTicket,
 } from '@/lib/api'
 
 const STATUS_OPTIONS: TicketStatus[] = [
@@ -114,7 +115,9 @@ export function ActionButtons({ ticket, onUpdate }: ActionButtonsProps) {
     setReplyError('')
     setReplyLoading(true)
     try {
-      await addReply(ticket.ticket_id, replyBody, replyAuthor)
+      await addReply(ticket.ticket_id, replyBody)
+      const freshTicket = await getTicket(ticket.ticket_id)
+      onUpdate(freshTicket)
       setReplyBody('')
       setReplyAuthor('support-agent')
     } catch (e) {

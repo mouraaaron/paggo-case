@@ -10,7 +10,7 @@ export function AuditLog({ events }: { events: AuditEvent[] }) {
   return (
     <ol className="relative border-l border-gray-200 space-y-4 ml-3">
       {events.map((event) => (
-        <li key={event.id} className="ml-4">
+        <li key={event.id} className="relative ml-4">
           {/* Timeline dot */}
           <span className="absolute -left-1.5 mt-1.5 h-3 w-3 rounded-full border border-white bg-gray-300" />
 
