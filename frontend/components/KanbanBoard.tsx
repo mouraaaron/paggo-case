@@ -34,6 +34,7 @@ const FLAGS = ['', 'CHURN_SIGNAL', 'SLA_BREACH', 'URGENT_UNATTENDED', 'MULTIPLE_
 
 type ColumnData = Record<string, Ticket[]>
 type GlobalFilters = { priority?: string; segment?: string; has_flag?: string }
+type PendingTransition = { ticket: Ticket; sourceColKey: string; targetStatus: string }
 
 export function KanbanBoard() {
   const [columns, setColumns] = useState<ColumnData>(
@@ -46,11 +47,16 @@ export function KanbanBoard() {
   )
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
   const [draggingTicket, setDraggingTicket] = useState<Ticket | null>(null)
+  const [pendingTransition, setPendingTransition] = useState<PendingTransition | null>(null)
   const [toast, setToast] = useState<string | null>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   )
+
+  function statusLabel(status: string): string {
+    return COLUMNS.find(c => c.status === status)?.label ?? status
+  }
 
   function showToast(msg: string) {
     setToast(msg)
@@ -112,7 +118,7 @@ export function KanbanBoard() {
     }
   }
 
-  async function handleDragEnd(event: DragEndEvent) {
+  function handleDragEnd(event: DragEndEvent) {
     setDraggingTicket(null)
     const { active, over } = event
     if (!over) return
@@ -134,10 +140,19 @@ export function KanbanBoard() {
       return
     }
 
+    setPendingTransition({ ticket, sourceColKey, targetStatus })
+  }
+
+  async function confirmTransition() {
+    if (!pendingTransition) return
+    const { ticket, sourceColKey, targetStatus } = pendingTransition
+    const ticketId = ticket.ticket_id
+    setPendingTransition(null)
+
     const optimistic: Ticket = { ...ticket, status: targetStatus as TicketStatus }
     setColumns(prev => {
       const next = { ...prev }
-      next[sourceColKey!] = prev[sourceColKey!].filter(t => t.ticket_id !== ticketId)
+      next[sourceColKey] = prev[sourceColKey].filter(t => t.ticket_id !== ticketId)
       next[targetStatus] = [...prev[targetStatus], optimistic].sort(
         (a, b) => b.risk_score - a.risk_score
       )
@@ -156,13 +171,17 @@ export function KanbanBoard() {
       setColumns(prev => {
         const next = { ...prev }
         next[targetStatus] = prev[targetStatus].filter(t => t.ticket_id !== ticketId)
-        next[sourceColKey!] = [...prev[sourceColKey!], ticket!].sort(
+        next[sourceColKey] = [...prev[sourceColKey], ticket].sort(
           (a, b) => b.risk_score - a.risk_score
         )
         return next
       })
       showToast(err instanceof Error ? err.message : 'Erro ao atualizar status')
     }
+  }
+
+  function cancelTransition() {
+    setPendingTransition(null)
   }
 
   function handleTicketUpdate(updated: Ticket) {
@@ -226,6 +245,25 @@ export function KanbanBoard() {
         {loading && <span className="text-sm text-gray-400 ml-1">Carregando...</span>}
       </div>
 
+      <div className="flex flex-wrap gap-4 mb-4 text-xs text-gray-600">
+        <div className="flex items-center gap-1.5">
+          <span className="inline-block w-3 h-4 rounded-sm border-l-4 border-l-pink-500 border border-gray-100 bg-white" />
+          Sinal de churn detectado
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="inline-block w-3 h-4 rounded-sm border-l-4 border-l-pink-500 border border-dashed border-gray-300 bg-white" />
+          Sinal de churn + sem responsável
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="inline-block w-3 h-4 rounded-sm border-l-4 border-l-red-500 border border-gray-100 bg-white" />
+          Risco alto (score ≥ 70)
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="inline-block w-3 h-4 rounded-sm border-l-4 border-l-gray-200 border border-dashed border-gray-300 bg-white" />
+          Sem responsável
+        </div>
+      </div>
+
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -258,6 +296,41 @@ export function KanbanBoard() {
         onClose={() => setSelectedTicket(null)}
         onUpdate={handleTicketUpdate}
       />
+
+      {pendingTransition && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/30" onClick={cancelTransition} />
+          <div className="relative bg-white rounded-xl shadow-2xl p-6 w-80">
+            <h2 className="text-base font-semibold mb-1">Confirmar mudança de status</h2>
+            <p className="text-sm text-gray-500 mb-4 truncate">
+              #{pendingTransition.ticket.ticket_id.slice(-6)} — {pendingTransition.ticket.subject}
+            </p>
+            <div className="flex items-center justify-center gap-3 text-sm font-medium mb-6">
+              <span className="px-2 py-1 rounded bg-gray-100 text-gray-700">
+                {statusLabel(pendingTransition.ticket.status)}
+              </span>
+              <span className="text-gray-400">→</span>
+              <span className="px-2 py-1 rounded bg-blue-100 text-blue-700">
+                {statusLabel(pendingTransition.targetStatus)}
+              </span>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={cancelTransition}
+                className="flex-1 px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmTransition}
+                className="flex-1 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-red-600 text-white text-sm px-5 py-2.5 rounded-lg shadow-xl z-50">
