@@ -14,11 +14,11 @@ interface TicketSidePanelProps {
 
 export function TicketSidePanel({ ticket, onClose, onUpdate }: TicketSidePanelProps) {
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([])
-  const [activeTab, setActiveTab] = useState<'actions' | 'audit'>('actions')
+  const [activeTab, setActiveTab] = useState<'message' | 'actions' | 'audit'>('message')
 
   useEffect(() => {
     if (!ticket) return
-    setActiveTab('actions')
+    setActiveTab('message')
     setAuditEvents([])
     getAuditLog(ticket.ticket_id).then(setAuditEvents).catch(() => {})
   }, [ticket?.ticket_id])
@@ -52,7 +52,7 @@ export function TicketSidePanel({ ticket, onClose, onUpdate }: TicketSidePanelPr
         </div>
 
         <div className="flex border-b">
-          {(['actions', 'audit'] as const).map(tab => (
+          {(['message', 'actions', 'audit'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -62,16 +62,26 @@ export function TicketSidePanel({ ticket, onClose, onUpdate }: TicketSidePanelPr
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              {tab === 'actions' ? 'Ações' : 'Audit Log'}
+              {tab === 'message' ? 'Mensagem' : tab === 'actions' ? 'Ações' : 'Audit Log'}
             </button>
           ))}
         </div>
 
         <div className="flex-1 overflow-y-auto p-4">
-          {activeTab === 'actions'
-            ? <ActionButtons ticket={ticket} onUpdate={onUpdate} />
-            : <AuditLog events={auditEvents} />
-          }
+          {activeTab === 'message' ? (
+            <div>
+              <p className="text-xs text-gray-400 mb-1">
+                {ticket.created_at ? new Date(ticket.created_at).toLocaleString('pt-BR') : '—'}
+              </p>
+              <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+                {ticket.body_preview || '(sem conteúdo)'}
+              </p>
+            </div>
+          ) : activeTab === 'actions' ? (
+            <ActionButtons ticket={ticket} onUpdate={onUpdate} />
+          ) : (
+            <AuditLog events={auditEvents} />
+          )}
         </div>
       </div>
     </>
