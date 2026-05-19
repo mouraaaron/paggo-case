@@ -33,7 +33,7 @@ const SEGMENTS = ['', 'SMB', 'MID', 'ENT']
 const FLAGS = ['', 'CHURN_SIGNAL', 'SLA_BREACH', 'URGENT_UNATTENDED', 'MULTIPLE_OPEN', 'STALE_IN_PROGRESS']
 
 type ColumnData = Record<string, Ticket[]>
-type GlobalFilters = { priority?: string; segment?: string; has_flag?: string }
+type GlobalFilters = { priority?: string; segment?: string; has_flag?: string; created_after?: string; created_before?: string }
 type PendingTransition = { ticket: Ticket; sourceColKey: string; targetStatus: string }
 
 export function KanbanBoard() {
@@ -225,6 +225,21 @@ export function KanbanBoard() {
         >
           {FLAGS.map(f => <option key={f} value={f}>{f || 'Flag'}</option>)}
         </select>
+
+        <div className="flex items-center gap-1 text-sm">
+          <label className="text-gray-500 text-xs whitespace-nowrap">De</label>
+          <input
+            type="date"
+            className="border rounded px-2 py-1 text-sm"
+            onChange={e => setFilter('created_after', e.target.value)}
+          />
+          <label className="text-gray-500 text-xs whitespace-nowrap">até</label>
+          <input
+            type="date"
+            className="border rounded px-2 py-1 text-sm"
+            onChange={e => setFilter('created_before', e.target.value)}
+          />
+        </div>
 
         <div className="flex gap-1 flex-wrap">
           {COLUMNS.map(col => (

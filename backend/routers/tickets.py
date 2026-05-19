@@ -16,6 +16,8 @@ def list_tickets(
     assigned_to: str | None = Query(None),
     category: str | None = Query(None),
     has_flag: str | None = Query(None),
+    created_after: str | None = Query(None),
+    created_before: str | None = Query(None),
     sort_by: str = Query("risk_score"),
     sort_desc: bool = Query(True),
     limit: int = Query(100, le=500),
@@ -38,6 +40,10 @@ def list_tickets(
         query = query.eq("category", category)
     if has_flag:
         query = query.contains("triage_flags", [has_flag])
+    if created_after:
+        query = query.gte("created_at", created_after)
+    if created_before:
+        query = query.lte("created_at", f"{created_before}T23:59:59.999999")
 
     query = query.order(sort_by, desc=sort_desc).range(offset, offset + limit - 1)
     result = query.execute()

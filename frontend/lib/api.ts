@@ -20,6 +20,8 @@ export interface TicketFilters {
   assigned_to?: string
   category?: string
   has_flag?: string
+  created_after?: string
+  created_before?: string
   sort_by?: string
   sort_desc?: boolean
   limit?: number
