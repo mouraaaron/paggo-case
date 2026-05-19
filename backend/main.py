@@ -1,12 +1,18 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import tickets, audit, agent
+from dotenv import load_dotenv
+
+load_dotenv()
+
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
 
 app = FastAPI(title="Paggo Case API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # DEVELOPMENT ONLY — restrict to Vercel URL before production
+    allow_origins=ALLOWED_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
