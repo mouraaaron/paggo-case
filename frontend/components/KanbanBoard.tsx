@@ -7,6 +7,9 @@ import {
   DragStartEvent,
   DragOverlay,
   closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
 } from '@dnd-kit/core'
 import { Ticket, TicketStatus } from '@/types'
 import { getTickets, updateStatus } from '@/lib/api'
@@ -22,6 +25,7 @@ const COLUMNS = [
   { status: 'WAITING_CUSTOMER', label: 'Aguardando' },
   { status: 'RESOLVED', label: 'Resolvido' },
   { status: 'CLOSED', label: 'Encerrado' },
+  { status: 'REOPENED', label: 'Reaberto' },
 ]
 
 const PRIORITIES = ['', 'LOW', 'MEDIUM', 'HIGH', 'URGENT']
@@ -43,6 +47,10 @@ export function KanbanBoard() {
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
   const [draggingTicket, setDraggingTicket] = useState<Ticket | null>(null)
   const [toast, setToast] = useState<string | null>(null)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  )
 
   function showToast(msg: string) {
     setToast(msg)
@@ -80,7 +88,8 @@ export function KanbanBoard() {
   }, [filtersKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    loadColumns()
+    const timer = setTimeout(() => loadColumns(), 300)
+    return () => clearTimeout(timer)
   }, [loadColumns])
 
   function setFilter(key: keyof GlobalFilters, value: string) {
@@ -218,6 +227,7 @@ export function KanbanBoard() {
       </div>
 
       <DndContext
+        sensors={sensors}
         collisionDetection={closestCenter}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
