@@ -62,6 +62,7 @@ export function ActionButtons({ ticket, onUpdate }: ActionButtonsProps) {
 
   // Section D — Add Reply
   const [replyBody, setReplyBody] = useState('')
+  const [replyAuthor, setReplyAuthor] = useState('support-agent')
   const [replyError, setReplyError] = useState('')
   const [replyLoading, setReplyLoading] = useState(false)
 
@@ -113,8 +114,9 @@ export function ActionButtons({ ticket, onUpdate }: ActionButtonsProps) {
     setReplyError('')
     setReplyLoading(true)
     try {
-      await addReply(ticket.ticket_id, replyBody)
+      await addReply(ticket.ticket_id, replyBody, replyAuthor)
       setReplyBody('')
+      setReplyAuthor('support-agent')
     } catch (e) {
       setReplyError(e instanceof Error ? e.message : 'Error sending reply')
     } finally {
@@ -225,6 +227,13 @@ export function ActionButtons({ ticket, onUpdate }: ActionButtonsProps) {
       {/* Section D — Add Reply */}
       <section className="border border-gray-200 rounded p-3">
         <h3 className="text-sm font-semibold text-gray-700 mb-2">Add Reply</h3>
+        <input
+          type="text"
+          className="border border-gray-300 rounded px-2 py-1 text-sm w-full mb-2"
+          placeholder="Author"
+          value={replyAuthor}
+          onChange={(e) => setReplyAuthor(e.target.value)}
+        />
         <textarea
           className="border border-gray-300 rounded px-2 py-1 text-sm w-full resize-none mb-2"
           rows={3}
