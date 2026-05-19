@@ -5,7 +5,7 @@ app = FastAPI(title="Paggo Case API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "*"],
+    allow_origins=["*"],  # DEVELOPMENT ONLY — restrict to Vercel URL before production
     allow_methods=["*"],
     allow_headers=["*"],
 )
