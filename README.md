@@ -1,29 +1,69 @@
-# Paggo Case — Support Ticket Triage System
+# Paggo Case — Sistema de Triagem de Tickets de Suporte
 
-A full-stack application for triaging ~8,000 support tickets, built with FastAPI + Next.js + Supabase + OpenAI.
+> **⚠️ Aviso sobre o primeiro acesso:** O backend está hospedado no plano gratuito do Render, que hiberna após 15 minutos de inatividade. Se a página abrir sem dados ou exibir erro, aguarde 30–60 segundos e recarregue — o servidor estará acordando. Acessos subsequentes são instantâneos.
 
-## Features
+Aplicação full-stack para triagem de ~8.000 tickets de suporte, construída com FastAPI + Next.js + Supabase + OpenAI.
 
-- **Inbox view** — filterable table of all tickets with triage badges and risk scores
-- **Ticket detail** — full action panel (status changes, classification, assignment, replies, close) with audit log
-- **AI Agent** — conversational assistant powered by GPT-4o-mini with tool calling; requires human confirmation before write actions
-- **Triage rules engine** — 5 rules generating a 0-100 risk score per ticket
-- **State machine** — enforces valid ticket status transitions (invalid transitions return HTTP 422)
-- **Audit log** — every change is recorded with actor, source (USER vs AGENT), old/new values
+## Funcionalidades
 
-## Tech Stack
+- **Inbox** — tabela filtrável de todos os tickets com badges de triagem e pontuação de risco
+- **Detalhe do ticket** — painel de ações completo (mudança de status, classificação, atribuição, respostas, encerramento) com audit log
+- **Agente de IA** — assistente conversacional com GPT-4o-mini e tool calling; exige confirmação humana antes de executar ações de escrita
+- **Motor de regras de triagem** — 5 regras que geram uma pontuação de risco de 0 a 100 por ticket
+- **Máquina de estados** — garante transições de status válidas (transições inválidas retornam HTTP 422)
+- **Audit log** — cada alteração é registrada com ator, origem (USER vs AGENT) e valores anterior/posterior
 
-| Layer | Technology |
+## Regras de Triagem
+
+As regras foram desenhadas para não depender da prioridade auto-informada pelo cliente, que costuma ser imprecisa:
+
+| Regra | Condição | Pontos |
+|---|---|---|
+| `SLA_BREACH` | Cliente ENT ou MID sem primeira resposta há mais de 4h | +40 (ENT) / +25 (MID) |
+| `CHURN_SIGNAL` | Palavras de churn no assunto ou corpo ("cancelar", "reembolso", "concorrente"...) | +35 |
+| `URGENT_UNATTENDED` | Prioridade URGENT sem resposta há mais de 4h | +20 |
+| `MULTIPLE_OPEN` | Cliente com 3 ou mais tickets abertos simultaneamente | +15 |
+| `STALE_IN_PROGRESS` | Ticket IN_PROGRESS sem atividade há mais de 72h | +15 |
+
+A pontuação final é a soma dos pontos ativos, limitada a 100. Tickets com qualquer flag ativa aparecem com destaque visual na inbox.
+
+## Ferramentas do Agente de IA
+
+| Ferramenta | Tipo | Descrição |
+|---|---|---|
+| `get_ticket` | Leitura | Retorna todos os detalhes de um ticket |
+| `list_tickets` | Leitura | Lista tickets com filtros opcionais |
+| `update_ticket_status` | **Escrita** | Altera o status (respeita a máquina de estados) |
+| `assign_ticket` | **Escrita** | Atribui o ticket a um agente |
+| `classify_ticket` | **Escrita** | Define prioridade e/ou categoria |
+
+Ações de escrita exigem confirmação explícita do usuário antes de serem executadas. Todas as ações do agente são registradas no audit log com `source: AGENT`.
+
+## Stack
+
+| Camada | Tecnologia |
 |---|---|
 | Frontend | Next.js 14 (App Router), TypeScript, Tailwind CSS |
 | Backend | FastAPI (Python), Pydantic v2 |
-| Database | Supabase (PostgreSQL) |
-| AI Agent | OpenAI GPT-4o-mini with function calling |
-| Hosting | Vercel (frontend) + Render (backend) |
+| Banco de dados | Supabase (PostgreSQL) |
+| Agente de IA | OpenAI GPT-4o-mini com function calling |
+| Hospedagem | Vercel (frontend) + Render (backend) |
 
-## Local Development
+## Arquitetura
 
-### Prerequisites
+```
+Browser → Next.js (Vercel)
+              ↓ fetch
+         FastAPI (Render)
+              ↓
+         Supabase (PostgreSQL)
+              ↓ (apenas agente de IA)
+         OpenAI API
+```
+
+## Desenvolvimento Local
+
+### Pré-requisitos
 - Python 3.11+
 - Node.js 18+
 
@@ -34,7 +74,7 @@ cd backend
 python -m venv venv
 venv\Scripts\activate      # Windows
 pip install -r requirements.txt
-# Copy .env.example to .env and fill in values
+# Copie .env.example para .env e preencha os valores
 uvicorn main:app --reload --port 8000
 ```
 
@@ -43,53 +83,25 @@ uvicorn main:app --reload --port 8000
 ```bash
 cd frontend
 npm install
-# .env.local already set to http://localhost:8000
+# .env.local já aponta para http://localhost:8000
 npm run dev
 ```
 
-Open http://localhost:3000
+Abra http://localhost:3000
 
-## Environment Variables
+## Variáveis de Ambiente
 
-### Backend (set in Render dashboard)
+### Backend (configurar no painel do Render)
 
-| Variable | Description |
+| Variável | Descrição |
 |---|---|
-| `SUPABASE_URL` | Your Supabase project URL |
-| `SUPABASE_SERVICE_KEY` | Supabase service role key (for write access) |
-| `OPENAI_API_KEY` | OpenAI API key |
-| `ALLOWED_ORIGINS` | Comma-separated list of allowed CORS origins (your Vercel URL) |
+| `SUPABASE_URL` | URL do projeto Supabase |
+| `SUPABASE_SERVICE_KEY` | Chave service role do Supabase (necessária para escrita) |
+| `OPENAI_API_KEY` | Chave da API da OpenAI |
+| `ALLOWED_ORIGINS` | Origens CORS permitidas, separadas por vírgula (URL do Vercel) |
 
-### Frontend (set in Vercel dashboard)
+### Frontend (configurar no painel da Vercel)
 
-| Variable | Description |
+| Variável | Descrição |
 |---|---|
-| `NEXT_PUBLIC_BACKEND_URL` | Your Render backend URL (e.g. https://paggo-case-api.onrender.com) |
-
-## Deployment
-
-### Backend → Render
-
-1. Push repo to GitHub
-2. Create new Web Service in Render, connect your repo
-3. Set root directory to `backend`
-4. Set environment variables in Render dashboard
-5. Deploy
-
-### Frontend → Vercel
-
-1. Import project in Vercel, set root directory to `frontend`
-2. Set `NEXT_PUBLIC_BACKEND_URL` to your Render backend URL
-3. Deploy
-
-## Architecture
-
-```
-Browser → Next.js (Vercel)
-              ↓ fetch
-         FastAPI (Render)
-              ↓
-         Supabase (PostgreSQL)
-              ↓ (AI agent only)
-         OpenAI API
-```
+| `NEXT_PUBLIC_BACKEND_URL` | URL do backend no Render (ex: https://paggo-case-api.onrender.com) |
