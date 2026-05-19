@@ -179,6 +179,17 @@ def run_agent(
     if confirmed_tool_call:
         result = _execute_tool(confirmed_tool_call["name"], confirmed_tool_call["args"])
         messages.append({
+            "role": "assistant",
+            "tool_calls": [{
+                "id": confirmed_tool_call.get("tool_call_id", "confirmed"),
+                "type": "function",
+                "function": {
+                    "name": confirmed_tool_call["name"],
+                    "arguments": json.dumps(confirmed_tool_call["args"])
+                }
+            }]
+        })
+        messages.append({
             "role": "tool",
             "tool_call_id": confirmed_tool_call.get("tool_call_id", "confirmed"),
             "content": result
@@ -209,7 +220,6 @@ def run_agent(
         args = json.loads(tool_call.function.arguments)
 
         if name in WRITE_TOOLS:
-            messages.append({"role": "user", "content": user_message})
             return {
                 "reply": f"I'd like to call **{name}** with: {json.dumps(args, indent=2)}. Shall I proceed?",
                 "pending_action": {"name": name, "args": args, "tool_call_id": tool_call.id},
