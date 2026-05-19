@@ -96,13 +96,20 @@ export function mergeTickets(primaryId: string, secondaryId: string): Promise<Ti
 }
 
 // --- Agent ---
-export function sendAgentMessage(
+export async function sendAgentMessage(
   message: string,
-  pendingActions: unknown[] = []
-): Promise<{ reply: string; pending_actions: unknown[] }> {
-  return req('/agent/chat', {
+  history: object[],
+  confirmedAction?: object | null
+): Promise<{ reply: string; pending_action: object | null; updated_history: object[] }> {
+  const res = await fetch(`${BASE}/agent/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, pending_actions: pendingActions }),
+    body: JSON.stringify({
+      message,
+      history,
+      confirmed_action: confirmedAction ?? null,
+    }),
   })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
 }
