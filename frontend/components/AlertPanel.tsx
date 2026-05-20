@@ -161,7 +161,7 @@ function VolumeBySegmentChart({ stats }: { stats: SegmentVolumeStat[] }) {
             <span className="text-[10px] font-mono w-8 text-right shrink-0 text-white font-bold">
               {total || '—'}
             </span>
-            <span className="text-[9px] text-brand-border w-20 shrink-0 text-right">
+            <span className="text-[11px] font-semibold w-20 shrink-0 text-right" style={{ color: total > 0 ? color : 'transparent' }}>
               {total > 0 ? `${open} abertos` : ''}
             </span>
           </div>
