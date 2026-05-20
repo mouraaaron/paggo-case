@@ -18,6 +18,7 @@ import { KanbanColumn } from './KanbanColumn'
 import { KanbanCard } from './KanbanCard'
 import { TicketSidePanel } from './TicketSidePanel'
 import { DateRangePicker } from './DateRangePicker'
+import { AlertPanel } from './AlertPanel'
 
 const COLUMNS = [
   { status: 'NEW', label: 'Novo' },
@@ -275,32 +276,40 @@ export function KanbanBoard() {
         </div>
       </div>
 
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-      >
-        <div className="flex gap-3 overflow-x-auto flex-1 px-5 py-4">
-          {COLUMNS.filter(col => visibleStatuses.has(col.status)).map(col => (
-            <KanbanColumn
-              key={col.status}
-              status={col.status}
-              label={col.label}
-              tickets={columns[col.status] ?? []}
-              onCardClick={setSelectedTicket}
-            />
-          ))}
-        </div>
+      <div className="flex flex-1 overflow-hidden">
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="flex gap-3 overflow-x-auto flex-1 px-5 py-4">
+            {COLUMNS.filter(col => visibleStatuses.has(col.status)).map(col => (
+              <KanbanColumn
+                key={col.status}
+                status={col.status}
+                label={col.label}
+                tickets={columns[col.status] ?? []}
+                onCardClick={setSelectedTicket}
+              />
+            ))}
+          </div>
 
-        <DragOverlay>
-          {draggingTicket && (
-            <div className="rotate-1 opacity-80 scale-105">
-              <KanbanCard ticket={draggingTicket} onClick={() => {}} />
-            </div>
-          )}
-        </DragOverlay>
-      </DndContext>
+          <DragOverlay>
+            {draggingTicket && (
+              <div className="rotate-1 opacity-80 scale-105">
+                <KanbanCard ticket={draggingTicket} onClick={() => {}} />
+              </div>
+            )}
+          </DragOverlay>
+        </DndContext>
+
+        {/* Alert panel — fixed 320px sidebar */}
+        {/* TODO: collapse to bottom tab bar on screens < 1200px */}
+        <div className="w-80 shrink-0 border-l border-brand-border flex flex-col overflow-hidden">
+          <AlertPanel onTicketClick={setSelectedTicket} />
+        </div>
+      </div>
 
       <TicketSidePanel
         ticket={selectedTicket}
