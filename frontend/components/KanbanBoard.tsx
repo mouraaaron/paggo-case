@@ -32,7 +32,7 @@ const COLUMNS = [
 
 const PRIORITIES = ['', 'LOW', 'MEDIUM', 'HIGH', 'URGENT']
 const SEGMENTS = ['', 'SMB', 'MID', 'ENT']
-const FLAGS = ['', 'CHURN_SIGNAL', 'SLA_BREACH', 'URGENT_UNATTENDED', 'MULTIPLE_OPEN', 'STALE_IN_PROGRESS']
+const FLAGS = ['', 'CHURN_UNASSIGNED', 'ENT_NO_REPLY_2H', 'CHURN_SIGNAL', 'MID_NO_REPLY_2H', 'MULTIPLE_OPEN', 'STALE_IN_PROGRESS']
 
 type ColumnData = Record<string, Ticket[]>
 type GlobalFilters = { priority?: string; segment?: string; has_flag?: string; created_after?: string; created_before?: string }
