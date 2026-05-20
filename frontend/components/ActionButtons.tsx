@@ -143,11 +143,11 @@ export function ActionButtons({ ticket, onUpdate }: ActionButtonsProps) {
   return (
     <div className="space-y-4">
       {/* Section A — Change Status */}
-      <section className="border border-gray-200 rounded p-3">
-        <h3 className="text-sm font-semibold text-gray-700 mb-2">Change Status</h3>
+      <section className="border border-brand-border rounded-lg p-3 bg-brand-black">
+        <h3 className="text-xs font-bold text-brand-muted uppercase tracking-wide mb-2">Change Status</h3>
         <div className="flex gap-2 items-center">
           <select
-            className="border border-gray-300 rounded px-2 py-1 text-sm flex-1"
+            className="bg-brand-mid border border-brand-border rounded px-2 py-1.5 text-xs text-white flex-1 focus:outline-none focus:border-brand-green cursor-pointer"
             value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value as TicketStatus)}
           >
@@ -158,22 +158,22 @@ export function ActionButtons({ ticket, onUpdate }: ActionButtonsProps) {
             ))}
           </select>
           <button
-            className="bg-blue-600 text-white text-sm px-3 py-1 rounded disabled:opacity-50"
+            className="bg-brand-green text-brand-black text-xs font-bold px-3 py-1.5 rounded hover:brightness-110 disabled:opacity-40 transition-all cursor-pointer"
             onClick={handleStatusUpdate}
             disabled={statusLoading}
           >
             {statusLoading ? '...' : 'Update'}
           </button>
         </div>
-        {statusError && <p className="text-xs text-red-500 mt-1">{statusError}</p>}
+        {statusError && <p className="text-[10px] text-brand-error mt-1">{statusError}</p>}
       </section>
 
       {/* Section B — Classify */}
-      <section className="border border-gray-200 rounded p-3">
-        <h3 className="text-sm font-semibold text-gray-700 mb-2">Classify</h3>
+      <section className="border border-brand-border rounded-lg p-3 bg-brand-black">
+        <h3 className="text-xs font-bold text-brand-muted uppercase tracking-wide mb-2">Classify</h3>
         <div className="flex gap-2 mb-2">
           <select
-            className="border border-gray-300 rounded px-2 py-1 text-sm flex-1"
+            className="bg-brand-mid border border-brand-border rounded px-2 py-1.5 text-xs text-white flex-1 focus:outline-none focus:border-brand-green cursor-pointer"
             value={selectedPriority}
             onChange={(e) => setSelectedPriority(e.target.value as TicketPriority)}
           >
@@ -184,7 +184,7 @@ export function ActionButtons({ ticket, onUpdate }: ActionButtonsProps) {
             ))}
           </select>
           <select
-            className="border border-gray-300 rounded px-2 py-1 text-sm flex-1"
+            className="bg-brand-mid border border-brand-border rounded px-2 py-1.5 text-xs text-white flex-1 focus:outline-none focus:border-brand-green cursor-pointer"
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value as Exclude<TicketCategory, null>)}
           >
@@ -196,70 +196,70 @@ export function ActionButtons({ ticket, onUpdate }: ActionButtonsProps) {
           </select>
         </div>
         <button
-          className="bg-blue-600 text-white text-sm px-3 py-1 rounded disabled:opacity-50"
+          className="bg-brand-green text-brand-black text-xs font-bold px-3 py-1.5 rounded hover:brightness-110 disabled:opacity-40 transition-all cursor-pointer"
           onClick={handleClassify}
           disabled={classifyLoading}
         >
           {classifyLoading ? '...' : 'Classify'}
         </button>
-        {classifyError && <p className="text-xs text-red-500 mt-1">{classifyError}</p>}
+        {classifyError && <p className="text-[10px] text-brand-error mt-1">{classifyError}</p>}
       </section>
 
       {/* Section C — Assign */}
-      <section className="border border-gray-200 rounded p-3">
-        <h3 className="text-sm font-semibold text-gray-700 mb-2">Assign</h3>
+      <section className="border border-brand-border rounded-lg p-3 bg-brand-black">
+        <h3 className="text-xs font-bold text-brand-muted uppercase tracking-wide mb-2">Assign</h3>
         <div className="flex gap-2 items-center">
           <input
             type="text"
-            className="border border-gray-300 rounded px-2 py-1 text-sm flex-1"
+            className="bg-brand-mid border border-brand-border rounded px-2 py-1.5 text-xs text-white flex-1 focus:outline-none focus:border-brand-green"
             placeholder="Agent name"
             value={agentName}
             onChange={(e) => setAgentName(e.target.value)}
           />
           <button
-            className="bg-blue-600 text-white text-sm px-3 py-1 rounded disabled:opacity-50"
+            className="bg-brand-green text-brand-black text-xs font-bold px-3 py-1.5 rounded hover:brightness-110 disabled:opacity-40 transition-all cursor-pointer"
             onClick={handleAssign}
             disabled={assignLoading}
           >
             {assignLoading ? '...' : 'Assign'}
           </button>
         </div>
-        {assignError && <p className="text-xs text-red-500 mt-1">{assignError}</p>}
+        {assignError && <p className="text-[10px] text-brand-error mt-1">{assignError}</p>}
       </section>
 
       {/* Section D — Add Reply */}
-      <section className="border border-gray-200 rounded p-3">
-        <h3 className="text-sm font-semibold text-gray-700 mb-2">Add Reply</h3>
+      <section className="border border-brand-border rounded-lg p-3 bg-brand-black">
+        <h3 className="text-xs font-bold text-brand-muted uppercase tracking-wide mb-2">Add Reply</h3>
         <input
           type="text"
-          className="border border-gray-300 rounded px-2 py-1 text-sm w-full mb-2"
+          className="bg-brand-mid border border-brand-border rounded px-2 py-1.5 text-xs text-white w-full mb-2 focus:outline-none focus:border-brand-green"
           placeholder="Author"
           value={replyAuthor}
           onChange={(e) => setReplyAuthor(e.target.value)}
         />
         <textarea
-          className="border border-gray-300 rounded px-2 py-1 text-sm w-full resize-none mb-2"
+          className="bg-brand-mid border border-brand-border rounded px-2 py-1.5 text-xs text-white w-full resize-none mb-2 focus:outline-none focus:border-brand-green"
           rows={3}
           placeholder="Reply body..."
           value={replyBody}
           onChange={(e) => setReplyBody(e.target.value)}
         />
         <button
-          className="bg-blue-600 text-white text-sm px-3 py-1 rounded disabled:opacity-50"
+          className="bg-brand-green text-brand-black text-xs font-bold px-3 py-1.5 rounded hover:brightness-110 disabled:opacity-40 transition-all cursor-pointer"
           onClick={handleReply}
           disabled={replyLoading || !replyBody.trim()}
         >
           {replyLoading ? '...' : 'Send Reply'}
         </button>
-        {replyError && <p className="text-xs text-red-500 mt-1">{replyError}</p>}
+        {replyError && <p className="text-[10px] text-brand-error mt-1">{replyError}</p>}
       </section>
 
       {/* Section E — Close Ticket */}
-      <section className="border border-gray-200 rounded p-3">
-        <h3 className="text-sm font-semibold text-gray-700 mb-2">Close Ticket</h3>
+      <section className="border border-brand-border rounded-lg p-3 bg-brand-black">
+        <h3 className="text-xs font-bold text-brand-muted uppercase tracking-wide mb-2">Close Ticket</h3>
         <div className="flex gap-2 items-center">
           <select
-            className="border border-gray-300 rounded px-2 py-1 text-sm flex-1"
+            className="bg-brand-mid border border-brand-border rounded px-2 py-1.5 text-xs text-white flex-1 focus:outline-none focus:border-brand-green cursor-pointer"
             value={closeReason}
             onChange={(e) => setCloseReason(e.target.value)}
           >
@@ -270,14 +270,14 @@ export function ActionButtons({ ticket, onUpdate }: ActionButtonsProps) {
             ))}
           </select>
           <button
-            className="bg-red-600 text-white text-sm px-3 py-1 rounded disabled:opacity-50"
+            className="bg-brand-error/10 text-brand-error text-xs font-bold px-3 py-1.5 rounded border border-brand-error/25 hover:bg-brand-error/20 disabled:opacity-40 transition-colors cursor-pointer"
             onClick={handleClose}
             disabled={closeLoading}
           >
             {closeLoading ? '...' : 'Close'}
           </button>
         </div>
-        {closeError && <p className="text-xs text-red-500 mt-1">{closeError}</p>}
+        {closeError && <p className="text-[10px] text-brand-error mt-1">{closeError}</p>}
       </section>
     </div>
   )
