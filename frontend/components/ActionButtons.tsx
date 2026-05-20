@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Ticket, TicketStatus, TicketPriority, TicketCategory } from '@/types'
 import {
   updateStatus,
@@ -9,6 +9,7 @@ import {
   addReply,
   closeTicket,
   getTicket,
+  getAgents,
 } from '@/lib/api'
 
 const STATUS_OPTIONS: TicketStatus[] = [
@@ -57,9 +58,14 @@ export function ActionButtons({ ticket, onUpdate }: ActionButtonsProps) {
   const [classifyLoading, setClassifyLoading] = useState(false)
 
   // Section C — Assign
+  const [agents, setAgents] = useState<string[]>([])
   const [agentName, setAgentName] = useState(ticket.assigned_to ?? '')
   const [assignError, setAssignError] = useState('')
   const [assignLoading, setAssignLoading] = useState(false)
+
+  useEffect(() => {
+    getAgents().then(setAgents).catch(() => {})
+  }, [])
 
   // Section D — Add Reply
   const [replyBody, setReplyBody] = useState('')
@@ -207,21 +213,24 @@ export function ActionButtons({ ticket, onUpdate }: ActionButtonsProps) {
 
       {/* Section C — Assign */}
       <section className="border border-brand-border rounded-lg p-3 bg-brand-black">
-        <h3 className="text-xs font-bold text-brand-muted uppercase tracking-wide mb-2">Assign</h3>
+        <h3 className="text-xs font-bold text-brand-muted uppercase tracking-wide mb-2">Atribuir Agente</h3>
         <div className="flex gap-2 items-center">
-          <input
-            type="text"
-            className="bg-brand-mid border border-brand-border rounded px-2 py-1.5 text-xs text-white flex-1 focus:outline-none focus:border-brand-green"
-            placeholder="Agent name"
+          <select
+            className="bg-brand-mid border border-brand-border rounded px-2 py-1.5 text-xs text-white flex-1 focus:outline-none focus:border-brand-green cursor-pointer"
             value={agentName}
             onChange={(e) => setAgentName(e.target.value)}
-          />
+          >
+            <option value="">— Não atribuído —</option>
+            {agents.map((a) => (
+              <option key={a} value={a}>{a}</option>
+            ))}
+          </select>
           <button
             className="bg-brand-green text-brand-black text-xs font-bold px-3 py-1.5 rounded hover:brightness-110 disabled:opacity-40 transition-all cursor-pointer"
             onClick={handleAssign}
             disabled={assignLoading}
           >
-            {assignLoading ? '...' : 'Assign'}
+            {assignLoading ? '...' : 'Atribuir'}
           </button>
         </div>
         {assignError && <p className="text-[10px] text-brand-error mt-1">{assignError}</p>}

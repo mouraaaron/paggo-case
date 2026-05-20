@@ -89,6 +89,10 @@ export function closeTicket(ticketId: string, closeReason: string): Promise<Tick
   })
 }
 
+export function getAgents(): Promise<string[]> {
+  return req<string[]>('/tickets/agents')
+}
+
 export function mergeTickets(primaryId: string, secondaryId: string): Promise<Ticket> {
   return req<Ticket>('/tickets/merge', {
     method: 'POST',

@@ -64,6 +64,14 @@ def get_flagged_tickets(limit: int = Query(50)):
     return result.data
 
 
+@router.get("/agents", response_model=list[str])
+def list_agents():
+    db = get_db()
+    result = db.table("tickets").select("assigned_to").neq("assigned_to", None).execute()
+    agents = sorted({r["assigned_to"] for r in result.data if r["assigned_to"]})
+    return agents
+
+
 @router.get("/{ticket_id}", response_model=TicketOut)
 def get_ticket(ticket_id: str):
     db = get_db()
