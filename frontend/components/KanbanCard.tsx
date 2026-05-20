@@ -18,10 +18,13 @@ function timeAgo(dateStr: string | null): string {
   return `${Math.floor(diff / 86400)}d atrás`
 }
 
-function leftBorderClass(ticket: Ticket): string {
-  if (ticket.risk_score >= 70) return 'border-l-red-500'
-  if (ticket.triage_flags.includes('CHURN_SIGNAL')) return 'border-l-pink-500'
-  return 'border-l-gray-200'
+function cardBorderClass(ticket: Ticket): string {
+  const unassigned = !ticket.assigned_to
+  if (ticket.risk_score >= 70)
+    return unassigned ? 'border-2 border-dashed border-red-500' : 'border-2 border-red-500'
+  if (ticket.triage_flags.includes('CHURN_SIGNAL'))
+    return unassigned ? 'border-2 border-dashed border-pink-500' : 'border-2 border-pink-500'
+  return unassigned ? 'border border-dashed border-gray-300' : 'border border-gray-200'
 }
 
 function riskBarColor(score: number): string {
@@ -43,10 +46,6 @@ export function KanbanCard({ ticket, onClick }: KanbanCardProps) {
   const isUnassigned = !ticket.assigned_to
   const isEscalated = ticket.status === 'ESCALATED'
 
-  const borderBase = isUnassigned
-    ? 'border border-dashed border-gray-300'
-    : 'border border-gray-100'
-
   return (
     <div
       ref={setNodeRef}
@@ -54,7 +53,7 @@ export function KanbanCard({ ticket, onClick }: KanbanCardProps) {
       {...attributes}
       {...listeners}
       onClick={() => onClick(ticket)}
-      className={`bg-white rounded-lg shadow-sm p-3 cursor-grab active:cursor-grabbing select-none hover:shadow-md transition-shadow border-l-4 ${leftBorderClass(ticket)} ${borderBase}`}
+      className={`bg-white rounded-lg shadow-sm p-3 cursor-grab active:cursor-grabbing select-none hover:shadow-md transition-shadow ${cardBorderClass(ticket)}`}
     >
       {/* Row 1: id, segment, priority, urgent icon, escalated badge */}
       <div className="flex items-center gap-1 flex-wrap mb-1">

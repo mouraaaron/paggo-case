@@ -262,19 +262,19 @@ export function KanbanBoard() {
 
       <div className="flex flex-wrap gap-4 mb-4 text-xs text-gray-600">
         <div className="flex items-center gap-1.5">
-          <span className="inline-block w-3 h-4 rounded-sm border-l-4 border-l-pink-500 border border-gray-100 bg-white" />
+          <span className="inline-block w-3 h-4 rounded-sm border-2 border-pink-500 bg-white" />
           Sinal de churn detectado
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="inline-block w-3 h-4 rounded-sm border-l-4 border-l-pink-500 border border-dashed border-gray-300 bg-white" />
+          <span className="inline-block w-3 h-4 rounded-sm border-2 border-dashed border-pink-500 bg-white" />
           Sinal de churn + sem responsável
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="inline-block w-3 h-4 rounded-sm border-l-4 border-l-red-500 border border-gray-100 bg-white" />
+          <span className="inline-block w-3 h-4 rounded-sm border-2 border-red-500 bg-white" />
           Risco alto (score ≥ 70)
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="inline-block w-3 h-4 rounded-sm border-l-4 border-l-gray-200 border border-dashed border-gray-300 bg-white" />
+          <span className="inline-block w-3 h-4 rounded-sm border border-dashed border-gray-300 bg-white" />
           Sem responsável
         </div>
       </div>
