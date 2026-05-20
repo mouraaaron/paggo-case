@@ -8,6 +8,7 @@ load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file_
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from services.triage_rules import calculate_triage_flags
+from services.churn_classifier import classify_churn_batch
 
 
 def get_import_db():
@@ -31,50 +32,86 @@ def parse_int(value: str) -> int:
 
 def run():
     db = get_import_db()
-    batch = []
-    batch_size = 500
+
+    print("Reading CSV...")
+    with open(CSV_PATH, newline="", encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+    print(f"Read {len(rows)} rows.")
+
+    # --- LLM churn classification (batches of 25) ---
+    print("Running LLM churn classification...")
+    llm_batch_size = 25
+    churn_map: dict[str, bool] = {}
+
+    for i in range(0, len(rows), llm_batch_size):
+        batch_rows = rows[i:i + llm_batch_size]
+        tickets_for_llm = [
+            {
+                "ticket_id": r["ticketId"],
+                "subject": r.get("subject", ""),
+                "body_preview": r.get("bodyPreview", ""),
+            }
+            for r in batch_rows
+        ]
+        result = classify_churn_batch(tickets_for_llm)
+        churn_map.update(result)
+        for t in tickets_for_llm:
+            if t["ticket_id"] not in churn_map:
+                churn_map[t["ticket_id"]] = False
+
+        done = min(i + llm_batch_size, len(rows))
+        if done % 250 == 0 or done == len(rows):
+            churn_so_far = sum(1 for v in churn_map.values() if v)
+            print(f"  {done}/{len(rows)} classified — churn so far: {churn_so_far}")
+
+    churn_total = sum(1 for v in churn_map.values() if v)
+    print(f"LLM classification complete. Churn intent detected: {churn_total}/{len(rows)} tickets.")
+
+    # --- Triage + upsert ---
+    print("Processing triage and upserting...")
+    batch: list[dict] = []
+    upsert_batch_size = 500
     total = 0
 
-    with open(CSV_PATH, newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            ticket = {
-                "ticket_id": row["ticketId"],
-                "customer_id": row["customerId"],
-                "customer_name": row["customerName"],
-                "customer_segment": row["customerSegment"],
-                "plan": row["plan"],
-                "channel": row["channel"],
-                "subject": row["subject"],
-                "body_preview": row["bodyPreview"],
-                "created_at": parse_nullable(row["createdAt"]),
-                "last_reply_at": parse_nullable(row["lastReplyAt"]),
-                "last_reply_by": parse_nullable(row["lastReplyBy"]),
-                "reply_count": parse_int(row["replyCount"]),
-                "status": row.get("status") or "NEW",
-                "priority": parse_nullable(row["priority"]),
-                "assigned_to": parse_nullable(row["assignedTo"]),
-                "category": parse_nullable(row["category"]),
-                "previous_open_tickets_for_customer": parse_int(row["previousOpenTicketsForCustomer"]),
-            }
-            flags, score, priority = calculate_triage_flags(ticket)
-            ticket["triage_flags"] = flags
-            ticket["risk_score"] = score
-            ticket["priority"] = priority
-            batch.append(ticket)
+    for row in rows:
+        ticket = {
+            "ticket_id": row["ticketId"],
+            "customer_id": row["customerId"],
+            "customer_name": row["customerName"],
+            "customer_segment": row["customerSegment"],
+            "plan": row["plan"],
+            "channel": row["channel"],
+            "subject": row["subject"],
+            "body_preview": row["bodyPreview"],
+            "created_at": parse_nullable(row["createdAt"]),
+            "last_reply_at": parse_nullable(row["lastReplyAt"]),
+            "last_reply_by": parse_nullable(row["lastReplyBy"]),
+            "reply_count": parse_int(row["replyCount"]),
+            "status": row.get("status") or "NEW",
+            "priority": parse_nullable(row["priority"]),
+            "assigned_to": parse_nullable(row["assignedTo"]),
+            "category": parse_nullable(row["category"]),
+            "previous_open_tickets_for_customer": parse_int(row["previousOpenTicketsForCustomer"]),
+        }
+        has_churn = churn_map.get(ticket["ticket_id"], False)
+        flags, score, priority = calculate_triage_flags(ticket, has_churn=has_churn)
+        ticket["triage_flags"] = flags
+        ticket["risk_score"] = score
+        ticket["priority"] = priority
+        batch.append(ticket)
 
-            if len(batch) >= batch_size:
-                db.table("tickets").upsert(batch).execute()
-                total += len(batch)
-                print(f"Upserted {total} tickets...")
-                batch = []
-
-        if batch:
+        if len(batch) >= upsert_batch_size:
             db.table("tickets").upsert(batch).execute()
             total += len(batch)
-            print(f"Upserted final {len(batch)} tickets.")
+            print(f"Upserted {total} tickets...")
+            batch = []
 
-    print(f"Import complete. Total: {total} tickets.")
+    if batch:
+        db.table("tickets").upsert(batch).execute()
+        total += len(batch)
+        print(f"Upserted final {len(batch)} tickets.")
+
+    print(f"\nImport complete. Total: {total} tickets.")
 
 if __name__ == "__main__":
     run()

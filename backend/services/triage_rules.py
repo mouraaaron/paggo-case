@@ -25,11 +25,12 @@ def _age_hours(dt: datetime | None) -> float:
         dt = dt.replace(tzinfo=timezone.utc)
     return (now - dt).total_seconds() / 3600
 
-def calculate_triage_flags(ticket: dict) -> tuple[list[str], int, str]:
+def calculate_triage_flags(ticket: dict, has_churn: bool | None = None) -> tuple[list[str], int, str]:
     """
     Returns (flags, risk_score 0-100, priority) for a ticket dict.
     Rules are additive; score is capped at 100.
     Priority derived from score: >=70=URGENT, 40-69=HIGH, 10-39=MEDIUM, <10=LOW.
+    Pass has_churn=True/False to override keyword-based detection (e.g. from LLM).
     """
     flags: list[str] = []
     score = 0
@@ -46,8 +47,9 @@ def calculate_triage_flags(ticket: dict) -> tuple[list[str], int, str]:
     except (ValueError, TypeError):
         prev_open = 0
 
-    text = f"{ticket.get('subject', '')} {ticket.get('body_preview', '')}".lower()
-    has_churn = any(kw in text for kw in CHURN_KEYWORDS)
+    if has_churn is None:
+        text = f"{ticket.get('subject', '')} {ticket.get('body_preview', '')}".lower()
+        has_churn = any(kw in text for kw in CHURN_KEYWORDS)
 
     # Rule 1: CHURN_UNASSIGNED — churn signal + no agent assigned
     if has_churn and not assigned_to:
