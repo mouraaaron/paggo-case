@@ -102,16 +102,16 @@ export default function AgentChat() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 flex-shrink-0">
-        <h1 className="text-lg font-semibold text-gray-900">AI Triage Assistant</h1>
-        <p className="text-sm text-gray-500">Ask me to triage, assign, classify, or manage tickets.</p>
+      <div className="bg-brand-surface border-b border-brand-border px-4 py-3 flex-shrink-0">
+        <h1 className="text-base font-bold text-white">Assistente de Triagem</h1>
+        <p className="text-xs text-brand-muted">Pergunte sobre tickets, atribuições, status e classificações.</p>
       </div>
 
       {/* Messages area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-brand-black">
         {messages.length === 0 && (
-          <p className="text-center text-gray-400 text-sm mt-8">
-            Start a conversation with the AI Triage Assistant.
+          <p className="text-center text-brand-muted text-xs mt-8">
+            Inicie uma conversa com o assistente de triagem.
           </p>
         )}
         {messages.map((msg) => (
@@ -120,10 +120,10 @@ export default function AgentChat() {
             className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-[75%] rounded-2xl px-4 py-2 text-sm whitespace-pre-wrap break-words ${
+              className={`max-w-[75%] rounded-2xl px-4 py-2 text-xs whitespace-pre-wrap break-words ${
                 msg.role === 'user'
-                  ? 'bg-blue-600 text-white rounded-br-sm'
-                  : 'bg-white text-gray-800 border border-gray-200 rounded-bl-sm shadow-sm'
+                  ? 'bg-brand-green text-brand-black font-medium rounded-br-sm'
+                  : 'bg-brand-surface text-gray-200 border border-brand-border rounded-bl-sm'
               }`}
             >
               {msg.content}
@@ -132,8 +132,8 @@ export default function AgentChat() {
         ))}
         {loading && (
           <div className="flex justify-start">
-            <div className="bg-white border border-gray-200 rounded-2xl rounded-bl-sm px-4 py-2 text-sm text-gray-400 shadow-sm">
-              Thinking...
+            <div className="bg-brand-surface border border-brand-border rounded-2xl rounded-bl-sm px-4 py-2 text-xs text-brand-muted">
+              Pensando...
             </div>
           </div>
         )}
@@ -142,13 +142,13 @@ export default function AgentChat() {
 
       {/* Pending action banner */}
       {pendingAction && (
-        <div className="flex-shrink-0 bg-amber-50 border-t border-amber-200 px-4 py-3">
-          <p className="text-sm font-medium text-amber-800 mb-1">
-            Agent wants to:{' '}
-            <span className="font-semibold">{pendingAction.name ?? 'unknown action'}</span>
+        <div className="flex-shrink-0 bg-brand-surface border-t border-brand-green/30 px-4 py-3">
+          <p className="text-xs font-semibold text-brand-green mb-1">
+            O agente quer executar:{' '}
+            <span className="font-bold">{pendingAction.name ?? 'unknown action'}</span>
           </p>
           {pendingAction.args && (
-            <pre className="text-xs text-amber-700 bg-amber-100 rounded p-2 mb-2 overflow-x-auto">
+            <pre className="text-[10px] text-gray-300 bg-brand-mid rounded p-2 mb-2 overflow-x-auto border border-brand-border">
               {JSON.stringify(pendingAction.args, null, 2)}
             </pre>
           )}
@@ -156,39 +156,39 @@ export default function AgentChat() {
             <button
               onClick={handleConfirm}
               disabled={loading}
-              className="px-3 py-1.5 text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white rounded-lg disabled:opacity-50 transition-colors"
+              className="px-3 py-1.5 text-xs font-bold bg-brand-green text-brand-black rounded-lg disabled:opacity-40 hover:brightness-110 transition-all cursor-pointer"
             >
-              Confirm
+              Confirmar
             </button>
             <button
               onClick={handleCancel}
               disabled={loading}
-              className="px-3 py-1.5 text-sm font-medium bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 rounded-lg disabled:opacity-50 transition-colors"
+              className="px-3 py-1.5 text-xs font-medium bg-transparent text-brand-muted border border-brand-border rounded-lg disabled:opacity-40 hover:text-white hover:border-white transition-colors cursor-pointer"
             >
-              Cancel
+              Cancelar
             </button>
           </div>
         </div>
       )}
 
       {/* Input area */}
-      <div className="flex-shrink-0 border-t border-gray-200 bg-white p-3 flex gap-2 items-end">
+      <div className="flex-shrink-0 border-t border-brand-border bg-brand-surface p-3 flex gap-2 items-end">
         <textarea
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           disabled={loading}
-          placeholder="Type a message… (Enter to send, Shift+Enter for newline)"
+          placeholder="Digite uma mensagem… (Enter para enviar, Shift+Enter para nova linha)"
           rows={1}
-          className="flex-1 resize-none rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 leading-5"
+          className="flex-1 resize-none rounded-xl bg-brand-mid border border-brand-border px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-green disabled:opacity-50 leading-5 placeholder:text-brand-muted"
           style={{ maxHeight: '120px', overflowY: 'auto' }}
         />
         <button
           onClick={handleSend}
           disabled={loading || !input.trim()}
-          className="flex-shrink-0 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl disabled:opacity-50 transition-colors"
+          className="flex-shrink-0 px-4 py-2 bg-brand-green hover:brightness-110 text-brand-black text-xs font-bold rounded-xl disabled:opacity-40 transition-all cursor-pointer"
         >
-          Send
+          Enviar
         </button>
       </div>
     </div>
