@@ -9,6 +9,7 @@ import {
   addReply,
   closeTicket,
   getTicket,
+  sendAgentMessage,
 } from '@/lib/api'
 
 const AGENTS = [
@@ -80,6 +81,7 @@ export function ActionButtons({ ticket, onUpdate }: ActionButtonsProps) {
   const [replyAuthor, setReplyAuthor] = useState('support-agent')
   const [replyError, setReplyError] = useState('')
   const [replyLoading, setReplyLoading] = useState(false)
+  const [aiLoading, setAiLoading] = useState(false)
 
   // Section E — Close Ticket
   const [closeReason, setCloseReason] = useState(CLOSE_REASON_OPTIONS[0])
@@ -138,6 +140,27 @@ export function ActionButtons({ ticket, onUpdate }: ActionButtonsProps) {
       setReplyError(e instanceof Error ? e.message : 'Error sending reply')
     } finally {
       setReplyLoading(false)
+    }
+  }
+
+  async function handleAiSuggest() {
+    setAiLoading(true)
+    setReplyError('')
+    try {
+      const prompt =
+        `Gere uma sugestão de resposta em português para o seguinte ticket de suporte. ` +
+        `Seja profissional, empático e objetivo:\n\n` +
+        `Assunto: ${ticket.subject}\n` +
+        `Conteúdo: ${ticket.body_preview || '(sem preview)'}\n` +
+        `Status: ${ticket.status}\n` +
+        `Segmento: ${ticket.customer_segment || 'N/D'}\n` +
+        `Prioridade: ${ticket.priority || 'N/D'}`
+      const { reply } = await sendAgentMessage(prompt, [])
+      setReplyBody(reply)
+    } catch (e) {
+      setReplyError(e instanceof Error ? e.message : 'Erro ao gerar resposta')
+    } finally {
+      setAiLoading(false)
     }
   }
 
@@ -256,18 +279,35 @@ export function ActionButtons({ ticket, onUpdate }: ActionButtonsProps) {
         />
         <textarea
           className="bg-brand-mid border border-brand-border rounded px-2 py-1.5 text-xs text-white w-full resize-none mb-2 focus:outline-none focus:border-brand-green"
-          rows={3}
+          rows={4}
           placeholder="Reply body..."
           value={replyBody}
           onChange={(e) => setReplyBody(e.target.value)}
         />
-        <button
-          className="bg-brand-green text-brand-black text-xs font-bold px-3 py-1.5 rounded hover:brightness-110 disabled:opacity-40 transition-all cursor-pointer"
-          onClick={handleReply}
-          disabled={replyLoading || !replyBody.trim()}
-        >
-          {replyLoading ? '...' : 'Send Reply'}
-        </button>
+        <div className="flex gap-2">
+          <button
+            className="bg-brand-green text-brand-black text-xs font-bold px-3 py-1.5 rounded hover:brightness-110 disabled:opacity-40 transition-all cursor-pointer"
+            onClick={handleReply}
+            disabled={replyLoading || !replyBody.trim()}
+          >
+            {replyLoading ? '...' : 'Send Reply'}
+          </button>
+          <button
+            className="border border-brand-border text-brand-muted text-xs font-semibold px-3 py-1.5 rounded hover:border-brand-green hover:text-brand-green disabled:opacity-40 transition-colors cursor-pointer flex items-center gap-1.5"
+            onClick={handleAiSuggest}
+            disabled={aiLoading || replyLoading}
+            title="Gerar sugestão de resposta com IA (contexto limitado)"
+          >
+            {aiLoading ? (
+              <>
+                <span className="inline-block w-2 h-2 rounded-full bg-brand-green animate-pulse" />
+                Gerando...
+              </>
+            ) : (
+              <>✦ AI Agent</>
+            )}
+          </button>
+        </div>
         {replyError && <p className="text-[10px] text-brand-error mt-1">{replyError}</p>}
       </section>
 

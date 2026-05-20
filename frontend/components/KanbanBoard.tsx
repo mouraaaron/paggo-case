@@ -51,6 +51,7 @@ export function KanbanBoard() {
   const [draggingTicket, setDraggingTicket] = useState<Ticket | null>(null)
   const [pendingTransition, setPendingTransition] = useState<PendingTransition | null>(null)
   const [toast, setToast] = useState<string | null>(null)
+  const [statsRefreshKey, setStatsRefreshKey] = useState(0)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -188,6 +189,7 @@ export function KanbanBoard() {
 
   function handleTicketUpdate(updated: Ticket) {
     setSelectedTicket(updated)
+    setStatsRefreshKey(k => k + 1)
     setColumns(prev => {
       const next: ColumnData = Object.fromEntries(
         Object.entries(prev).map(([k, v]) => [
@@ -319,6 +321,7 @@ export function KanbanBoard() {
       <StatsBottomBar
         createdAfter={filters.created_after}
         createdBefore={filters.created_before}
+        refreshKey={statsRefreshKey}
       />
 
       <TicketSidePanel

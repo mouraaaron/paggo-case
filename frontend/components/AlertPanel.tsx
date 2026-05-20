@@ -181,9 +181,10 @@ function TrendsChart({ stats }: { stats: WeeklyStat[] }) {
 interface StatsBottomBarProps {
   createdAfter?: string
   createdBefore?: string
+  refreshKey?: number
 }
 
-export function StatsBottomBar({ createdAfter, createdBefore }: StatsBottomBarProps) {
+export function StatsBottomBar({ createdAfter, createdBefore, refreshKey }: StatsBottomBarProps) {
   const [agentStats, setAgentStats] = useState<AgentStat[]>([])
   const [weeklyStats, setWeeklyStats] = useState<WeeklyStat[]>([])
   const [loading, setLoading] = useState(true)
@@ -210,7 +211,7 @@ export function StatsBottomBar({ createdAfter, createdBefore }: StatsBottomBarPr
     }
     load()
     return () => { cancelled = true }
-  }, [createdAfter, createdBefore])
+  }, [createdAfter, createdBefore, refreshKey])
 
   if (loading) {
     return (
