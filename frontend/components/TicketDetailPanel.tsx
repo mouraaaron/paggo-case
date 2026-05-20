@@ -19,22 +19,22 @@ export function TicketDetailPanel({ initialTicket, auditEvents }: TicketDetailPa
   return (
     <div className="h-full flex flex-col">
       {/* Tab bar */}
-      <div className="flex border-b border-gray-200 mb-3">
+      <div className="flex border-b border-brand-border mb-3">
         <button
-          className={`px-4 py-2 text-sm font-medium ${
+          className={`px-4 py-2 text-xs font-semibold transition-colors cursor-pointer ${
             activeTab === 'actions'
-              ? 'border-b-2 border-blue-600 text-blue-600'
-              : 'text-gray-500 hover:text-gray-700'
+              ? 'border-b-2 border-brand-green text-brand-green'
+              : 'text-brand-muted hover:text-white'
           }`}
           onClick={() => setActiveTab('actions')}
         >
-          Actions
+          Ações
         </button>
         <button
-          className={`px-4 py-2 text-sm font-medium ${
+          className={`px-4 py-2 text-xs font-semibold transition-colors cursor-pointer ${
             activeTab === 'audit'
-              ? 'border-b-2 border-blue-600 text-blue-600'
-              : 'text-gray-500 hover:text-gray-700'
+              ? 'border-b-2 border-brand-green text-brand-green'
+              : 'text-brand-muted hover:text-white'
           }`}
           onClick={() => setActiveTab('audit')}
         >

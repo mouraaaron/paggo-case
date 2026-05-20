@@ -278,7 +278,7 @@ export function KanbanBoard() {
           Risco alto (score ≥ 70)
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="inline-block w-3 h-4 rounded-sm border border-dashed border-gray-300 bg-brand-surface" />
+          <span className="inline-block w-3 h-4 rounded-sm border border-dashed border-brand-muted bg-brand-surface" />
           Sem responsável
         </div>
       </div>
