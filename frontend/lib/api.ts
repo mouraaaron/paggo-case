@@ -101,6 +101,14 @@ export function mergeTickets(primaryId: string, secondaryId: string): Promise<Ti
   })
 }
 
+export function getWeeklyStats(): Promise<WeeklyStat[]> {
+  return req<WeeklyStat[]>('/tickets/stats/weekly')
+}
+
+export function getAgentStats(): Promise<AgentStat[]> {
+  return req<AgentStat[]>('/tickets/stats/agents')
+}
+
 // --- Agent ---
 export interface AgentHistoryEntry {
   role: string;
@@ -113,6 +121,21 @@ export interface AgentPendingAction {
   name: string;
   args: Record<string, unknown>;
   tool_call_id: string;
+}
+
+export interface WeeklyStat {
+  week: string
+  total: number
+  urgent: number
+}
+
+export interface AgentStat {
+  agent: string
+  urgent: number
+  high: number
+  medium: number
+  low: number
+  total: number
 }
 
 export async function sendAgentMessage(
