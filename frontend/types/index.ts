@@ -2,7 +2,13 @@ export type CustomerSegment = 'SMB' | 'MID' | 'ENT'
 export type TicketStatus = 'NEW' | 'TRIAGED' | 'IN_PROGRESS' | 'WAITING_CUSTOMER' | 'RESOLVED' | 'CLOSED' | 'ESCALATED' | 'REOPENED'
 export type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
 export type TicketCategory = 'BILLING' | 'BUG' | 'FEATURE_REQUEST' | 'HOW_TO' | 'CHURN_SIGNAL' | 'OTHER' | null
-export type TriageFlag = 'SLA_BREACH' | 'CHURN_SIGNAL' | 'URGENT_UNATTENDED' | 'MULTIPLE_OPEN' | 'STALE_IN_PROGRESS'
+export type TriageFlag =
+  | 'CHURN_UNASSIGNED'
+  | 'ENT_NO_REPLY_2H'
+  | 'CHURN_SIGNAL'
+  | 'MID_NO_REPLY_2H'
+  | 'MULTIPLE_OPEN'
+  | 'STALE_IN_PROGRESS'
 
 export interface Ticket {
   ticket_id: string
