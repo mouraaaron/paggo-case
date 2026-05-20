@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { CalendarIcon, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { Calendar, ChevronLeft, ChevronRight, X } from 'lucide-react'
 
 interface DateRangePickerProps {
   onRangeChange: (from: string | undefined, to: string | undefined) => void
@@ -11,24 +11,21 @@ const MONTHS = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
 ]
-const WEEKDAYS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S']
+const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
-function norm(d: Date): Date {
+function norm(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate())
 }
-
-function toYMD(d: Date): string {
+function toYMD(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
-
-function label(d: Date): string {
-  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
+function fmt(d: Date) {
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
-
-function daysInMonth(year: number, month: number): (Date | null)[] {
-  const firstPad = new Date(year, month, 1).getDay()
+function monthCells(year: number, month: number): (Date | null)[] {
+  const pad = new Date(year, month, 1).getDay()
   const total = new Date(year, month + 1, 0).getDate()
-  const cells: (Date | null)[] = Array(firstPad).fill(null)
+  const cells: (Date | null)[] = Array(pad).fill(null)
   for (let i = 1; i <= total; i++) cells.push(new Date(year, month, i))
   return cells
 }
@@ -52,84 +49,103 @@ export function DateRangePicker({ onRangeChange }: DateRangePickerProps) {
 
   function pickDay(day: Date) {
     const d = norm(day)
-    if (!start || (start && end)) {
+    if (!start || end) {
       setStart(d)
       setEnd(null)
     } else {
       const s = norm(start)
+      if (d.getTime() === s.getTime()) return
       if (d < s) {
         setStart(d); setEnd(s)
         onRangeChange(toYMD(d), toYMD(s))
-      } else if (d > s) {
+      } else {
         setEnd(d)
         onRangeChange(toYMD(s), toYMD(d))
       }
-      setOpen(false)
     }
   }
 
   function clear(e: React.MouseEvent) {
     e.stopPropagation()
-    setStart(null); setEnd(null)
+    setStart(null); setEnd(null); setHover(null)
     onRangeChange(undefined, undefined)
   }
 
   function prevMonth() {
     setView(v => v.month === 0 ? { year: v.year - 1, month: 11 } : { ...v, month: v.month - 1 })
   }
-
   function nextMonth() {
     setView(v => v.month === 11 ? { year: v.year + 1, month: 0 } : { ...v, month: v.month + 1 })
   }
 
-  function dayClass(day: Date): string {
+  function dayClass(day: Date) {
     const d = norm(day)
     const s = start ? norm(start) : null
-    const e = end ? norm(end) : (hover ? norm(hover) : null)
-
+    const e = end ? norm(end) : (start && hover ? norm(hover) : null)
     const isStart = s && d.getTime() === s.getTime()
-    const isEnd = end && e && d.getTime() === e.getTime()
+    const isEnd = e && d.getTime() === e.getTime()
     const inRange = s && e && d > s && d < e
-
-    if (isStart || isEnd) return 'bg-brand-green text-brand-black font-bold rounded-full'
-    if (inRange) return 'bg-brand-green/20 text-white rounded-sm'
+    if (isStart) return 'bg-brand-green text-brand-black font-bold rounded-l-full'
+    if (isEnd) return 'bg-brand-green text-brand-black font-bold rounded-r-full'
+    if (inRange) return 'bg-brand-green/20 text-white'
+    if (d.getTime() === today.getTime()) return 'text-brand-green font-semibold hover:bg-brand-mid rounded-full'
     return 'text-brand-muted hover:text-white hover:bg-brand-mid rounded-full'
   }
 
-  const btnLabel = start
-    ? end ? `${label(start)} – ${label(end)}` : `${label(start)} – ?`
-    : 'Período'
-
-  const cells = daysInMonth(view.year, view.month)
+  const hasRange = start && end
+  const step = !start ? 1 : !end ? 2 : null
 
   return (
     <div ref={ref} className="relative">
+      {/* Trigger — styled like the other filter selects */}
       <button
         onClick={() => setOpen(o => !o)}
-        className={`flex items-center gap-1.5 bg-brand-mid border px-2 py-1.5 rounded text-xs focus:outline-none cursor-pointer transition-colors ${
-          open ? 'border-brand-green text-white' : 'border-brand-border text-brand-muted hover:border-brand-green'
+        className={`flex items-center gap-2 bg-brand-mid border px-3 py-1.5 rounded text-xs focus:outline-none cursor-pointer transition-colors ${
+          open ? 'border-brand-green' : 'border-brand-border hover:border-brand-green/50'
         }`}
       >
-        <CalendarIcon size={12} className={start ? 'text-brand-green' : ''} />
-        <span className={start ? 'text-white' : ''}>{btnLabel}</span>
-        {start && (
-          <span onClick={clear} className="ml-0.5 text-brand-muted hover:text-white cursor-pointer">
-            <X size={10} />
-          </span>
+        <Calendar size={12} className="text-brand-muted shrink-0" />
+        {hasRange ? (
+          <>
+            <span className="text-white">{fmt(start!)} → {fmt(end!)}</span>
+            <span onClick={clear} className="text-brand-muted hover:text-white ml-1 cursor-pointer">
+              <X size={10} />
+            </span>
+          </>
+        ) : (
+          <span className="text-brand-muted">Período</span>
         )}
       </button>
 
+      {/* Dropdown calendar */}
       {open && (
-        <div className="absolute top-full left-0 mt-1.5 z-50 bg-brand-surface border border-brand-border rounded-xl shadow-2xl p-3 w-[252px] select-none">
-          {/* Month nav */}
-          <div className="flex items-center justify-between mb-3">
+        <div className="absolute top-full left-0 mt-1.5 z-50 bg-brand-surface border border-brand-border rounded-xl shadow-2xl select-none overflow-hidden w-[300px]">
+
+          {/* Selected range display */}
+          <div className="grid grid-cols-2 border-b border-brand-border">
+            <div className={`px-3 py-2.5 border-r border-brand-border ${step === 1 ? 'bg-brand-green/5' : ''}`}>
+              <p className="text-[9px] font-bold uppercase tracking-wider text-brand-muted mb-0.5">Início</p>
+              <p className={`text-xs font-semibold ${start ? 'text-brand-green' : 'text-brand-muted'}`}>
+                {start ? fmt(start) : '— / — / ——'}
+              </p>
+            </div>
+            <div className={`px-3 py-2.5 ${step === 2 ? 'bg-brand-green/5' : ''}`}>
+              <p className="text-[9px] font-bold uppercase tracking-wider text-brand-muted mb-0.5">Fim</p>
+              <p className={`text-xs font-semibold ${end ? 'text-brand-green' : 'text-brand-muted'}`}>
+                {end ? fmt(end) : '— / — / ——'}
+              </p>
+            </div>
+          </div>
+
+          {/* Month header */}
+          <div className="flex items-center justify-between px-4 py-2.5">
             <button
               onClick={prevMonth}
               className="w-6 h-6 flex items-center justify-center rounded text-brand-muted hover:text-white hover:bg-brand-mid cursor-pointer transition-colors"
             >
               <ChevronLeft size={13} />
             </button>
-            <span className="text-xs font-semibold text-white">
+            <span className="text-xs font-bold text-white">
               {MONTHS[view.month]} {view.year}
             </span>
             <button
@@ -140,16 +156,16 @@ export function DateRangePicker({ onRangeChange }: DateRangePickerProps) {
             </button>
           </div>
 
-          {/* Weekday row */}
-          <div className="grid grid-cols-7 mb-1">
+          {/* Weekday labels */}
+          <div className="grid grid-cols-7 px-2 mb-1">
             {WEEKDAYS.map((d, i) => (
               <div key={i} className="text-center text-[9px] text-brand-muted font-semibold py-0.5">{d}</div>
             ))}
           </div>
 
-          {/* Day cells */}
-          <div className="grid grid-cols-7 gap-y-0.5">
-            {cells.map((day, i) =>
+          {/* Days */}
+          <div className="grid grid-cols-7 px-2 pb-3 gap-y-0.5">
+            {monthCells(view.year, view.month).map((day, i) =>
               day ? (
                 <button
                   key={i}
@@ -160,16 +176,20 @@ export function DateRangePicker({ onRangeChange }: DateRangePickerProps) {
                 >
                   {day.getDate()}
                 </button>
-              ) : (
-                <div key={i} />
-              )
+              ) : <div key={i} />
             )}
           </div>
 
-          {/* Hint */}
-          <p className="text-[9px] text-brand-muted text-center mt-2 h-3">
-            {!start ? 'Selecione a data inicial' : !end ? 'Selecione a data final' : null}
-          </p>
+          {/* Status hint */}
+          {step && (
+            <div className="px-4 py-2 border-t border-brand-border bg-brand-black">
+              <p className="text-[10px] text-brand-muted text-center">
+                {step === 1
+                  ? '← Clique em um dia para definir a data de início'
+                  : '← Clique em outro dia para definir a data de fim'}
+              </p>
+            </div>
+          )}
         </div>
       )}
     </div>
