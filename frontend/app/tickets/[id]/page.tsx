@@ -4,51 +4,34 @@ import { TriageBadge } from '@/components/TriageBadge'
 import { TicketDetailPanel } from '@/components/TicketDetailPanel'
 import { CustomerSegment, TicketStatus } from '@/types'
 
-// ---- helpers ---------------------------------------------------------------
-
 function segmentColor(segment: CustomerSegment | null) {
   switch (segment) {
-    case 'ENT':
-      return 'bg-indigo-100 text-indigo-700'
-    case 'MID':
-      return 'bg-blue-100 text-blue-700'
-    case 'SMB':
-      return 'bg-gray-100 text-gray-700'
-    default:
-      return 'bg-gray-100 text-gray-500'
+    case 'ENT': return 'bg-violet-500/20 text-violet-300'
+    case 'MID': return 'bg-blue-500/20 text-blue-300'
+    case 'SMB': return 'bg-brand-mid text-brand-muted'
+    default:    return 'bg-brand-mid text-brand-muted'
   }
 }
 
 function statusColor(status: TicketStatus) {
   switch (status) {
-    case 'NEW':
-      return 'bg-blue-100 text-blue-700'
-    case 'TRIAGED':
-      return 'bg-yellow-100 text-yellow-700'
-    case 'IN_PROGRESS':
-      return 'bg-orange-100 text-orange-700'
-    case 'WAITING_CUSTOMER':
-      return 'bg-purple-100 text-purple-700'
-    case 'RESOLVED':
-      return 'bg-green-100 text-green-700'
-    case 'CLOSED':
-      return 'bg-gray-200 text-gray-600'
-    case 'ESCALATED':
-      return 'bg-red-100 text-red-700'
-    case 'REOPENED':
-      return 'bg-pink-100 text-pink-700'
-    default:
-      return 'bg-gray-100 text-gray-500'
+    case 'NEW':              return 'bg-blue-500/15 text-blue-300'
+    case 'TRIAGED':          return 'bg-yellow-500/15 text-yellow-300'
+    case 'IN_PROGRESS':      return 'bg-orange-500/15 text-orange-300'
+    case 'WAITING_CUSTOMER': return 'bg-purple-500/15 text-purple-300'
+    case 'RESOLVED':         return 'bg-brand-success/15 text-green-300'
+    case 'CLOSED':           return 'bg-brand-mid text-brand-muted'
+    case 'ESCALATED':        return 'bg-brand-error/15 text-red-300'
+    case 'REOPENED':         return 'bg-pink-500/15 text-pink-300'
+    default:                 return 'bg-brand-mid text-brand-muted'
   }
 }
 
 function riskColor(score: number) {
-  if (score < 30) return 'text-green-600'
-  if (score <= 70) return 'text-yellow-600'
-  return 'text-red-600'
+  if (score < 30) return 'text-brand-success'
+  if (score <= 70) return 'text-yellow-400'
+  return 'text-brand-error'
 }
-
-// ---- page ------------------------------------------------------------------
 
 export default async function TicketDetailPage({
   params,
@@ -59,44 +42,40 @@ export default async function TicketDetailPage({
   const [ticket, auditEvents] = await Promise.all([getTicket(id), getAuditLog(id)])
 
   return (
-    <main className="min-h-screen bg-gray-50 p-6">
-      {/* Back link */}
-      <Link href="/inbox" className="text-sm text-blue-600 hover:underline mb-4 inline-block">
-        ← Back to Inbox
+    <div className="min-h-screen bg-brand-black p-6">
+      <Link
+        href="/inbox"
+        className="text-xs text-brand-green hover:brightness-125 transition-all mb-4 inline-block"
+      >
+        ← Voltar ao Inbox
       </Link>
 
-      <div className="flex gap-6 mt-2">
-        {/* ---- Left column (1/4): Customer context ---- */}
-        <aside className="w-1/4 bg-white border border-gray-200 rounded-lg p-4 self-start">
-          <h2 className="text-lg font-bold text-gray-900 mb-1">
+      <div className="flex gap-5 mt-2">
+        {/* ── Left: Customer context ── */}
+        <aside className="w-1/4 bg-brand-surface border border-brand-border rounded-xl p-4 self-start">
+          <h2 className="text-base font-bold text-white mb-1">
             {ticket.customer_name ?? '—'}
           </h2>
-
-          {/* Segment badge */}
-          <span
-            className={`text-xs font-semibold px-2 py-0.5 rounded-full ${segmentColor(
-              ticket.customer_segment
-            )}`}
-          >
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${segmentColor(ticket.customer_segment)}`}>
             {ticket.customer_segment ?? 'Unknown'}
           </span>
 
-          <dl className="mt-3 space-y-1.5 text-sm">
+          <dl className="mt-3 space-y-2 text-xs">
             <div>
-              <dt className="text-gray-400 text-xs">Plan</dt>
-              <dd className="text-gray-800">{ticket.plan ?? '—'}</dd>
+              <dt className="text-[9px] text-brand-muted uppercase tracking-wide">Plano</dt>
+              <dd className="text-white mt-0.5">{ticket.plan ?? '—'}</dd>
             </div>
             <div>
-              <dt className="text-gray-400 text-xs">Channel</dt>
-              <dd className="text-gray-800">{ticket.channel ?? '—'}</dd>
+              <dt className="text-[9px] text-brand-muted uppercase tracking-wide">Canal</dt>
+              <dd className="text-white mt-0.5">{ticket.channel ?? '—'}</dd>
             </div>
             <div>
-              <dt className="text-gray-400 text-xs">Previous open tickets</dt>
-              <dd className="text-gray-800">{ticket.previous_open_tickets_for_customer}</dd>
+              <dt className="text-[9px] text-brand-muted uppercase tracking-wide">Tickets abertos anteriores</dt>
+              <dd className="text-white mt-0.5">{ticket.previous_open_tickets_for_customer}</dd>
             </div>
             <div>
-              <dt className="text-gray-400 text-xs">Risk score</dt>
-              <dd className={`font-semibold ${riskColor(ticket.risk_score)}`}>
+              <dt className="text-[9px] text-brand-muted uppercase tracking-wide">Risk Score</dt>
+              <dd className={`font-bold mt-0.5 ${riskColor(ticket.risk_score)}`}>
                 {ticket.risk_score}
               </dd>
             </div>
@@ -111,52 +90,48 @@ export default async function TicketDetailPage({
           )}
         </aside>
 
-        {/* ---- Middle column (1/2): Ticket body ---- */}
-        <section className="w-1/2 bg-white border border-gray-200 rounded-lg p-4 self-start">
+        {/* ── Middle: Ticket body ── */}
+        <section className="w-1/2 bg-brand-surface border border-brand-border rounded-xl p-4 self-start">
           <div className="flex items-start gap-3 mb-3">
-            <h1 className="text-xl font-bold text-gray-900 flex-1">
-              {ticket.subject ?? '(no subject)'}
+            <h1 className="text-lg font-bold text-white flex-1">
+              {ticket.subject ?? '(sem assunto)'}
             </h1>
-            <span
-              className={`text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${statusColor(
-                ticket.status
-              )}`}
-            >
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded whitespace-nowrap ${statusColor(ticket.status)}`}>
               {ticket.status}
             </span>
           </div>
 
-          <dl className="text-xs text-gray-400 space-y-0.5 mb-4">
+          <dl className="text-[10px] text-brand-muted space-y-0.5 mb-4">
             <div>
-              <span>Created: </span>
-              <span className="text-gray-600">
-                {ticket.created_at ? new Date(ticket.created_at).toLocaleString() : '—'}
+              <span>Criado: </span>
+              <span className="text-gray-400">
+                {ticket.created_at ? new Date(ticket.created_at).toLocaleString('pt-BR') : '—'}
               </span>
             </div>
             <div>
-              <span>Last reply: </span>
-              <span className="text-gray-600">
+              <span>Última resposta: </span>
+              <span className="text-gray-400">
                 {ticket.last_reply_at
-                  ? new Date(ticket.last_reply_at).toLocaleString()
+                  ? new Date(ticket.last_reply_at).toLocaleString('pt-BR')
                   : '—'}
               </span>
             </div>
             <div>
-              <span>Replies: </span>
-              <span className="text-gray-600">{ticket.reply_count}</span>
+              <span>Respostas: </span>
+              <span className="text-gray-400">{ticket.reply_count}</span>
             </div>
           </dl>
 
-          <pre className="bg-gray-50 border border-gray-100 rounded p-3 text-sm text-gray-700 whitespace-pre-wrap font-mono">
-            {ticket.body_preview ?? '(no content)'}
-          </pre>
+          <div className="bg-brand-black border border-brand-border rounded-lg p-3 text-xs text-gray-300 whitespace-pre-wrap leading-relaxed font-mono">
+            {ticket.body_preview ?? '(sem conteúdo)'}
+          </div>
         </section>
 
-        {/* ---- Right column (1/4): Actions + Audit Log ---- */}
-        <div className="w-1/4 bg-white border border-gray-200 rounded-lg p-4 self-start">
+        {/* ── Right: Actions + Audit Log ── */}
+        <div className="w-1/4 bg-brand-surface border border-brand-border rounded-xl p-4 self-start">
           <TicketDetailPanel initialTicket={ticket} auditEvents={auditEvents} />
         </div>
       </div>
-    </main>
+    </div>
   )
 }
