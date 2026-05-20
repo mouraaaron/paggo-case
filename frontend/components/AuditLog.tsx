@@ -4,42 +4,41 @@ import { AuditEvent } from '@/types'
 
 export function AuditLog({ events }: { events: AuditEvent[] }) {
   if (events.length === 0) {
-    return <p className="text-sm text-gray-500 italic">No audit events yet.</p>
+    return <p className="text-xs text-brand-muted italic">Sem eventos ainda.</p>
   }
 
   return (
-    <ol className="relative border-l border-gray-200 space-y-4 ml-3">
+    <ol className="relative border-l border-brand-border space-y-4 ml-3">
       {events.map((event) => (
         <li key={event.id} className="relative ml-4">
-          {/* Timeline dot */}
-          <span className="absolute -left-1.5 mt-1.5 h-3 w-3 rounded-full border border-white bg-gray-300" />
+          <span className="absolute -left-[7px] mt-1.5 h-3 w-3 rounded-full border border-brand-surface bg-brand-mid" />
 
           <div className="flex items-center gap-2 flex-wrap">
-            <time className="text-xs text-gray-400">
-              {new Date(event.created_at).toLocaleString()}
+            <time className="text-[10px] text-brand-muted">
+              {new Date(event.created_at).toLocaleString('pt-BR')}
             </time>
-            <span className="text-xs font-medium text-gray-700">{event.actor}</span>
+            <span className="text-[10px] font-medium text-gray-300">{event.actor}</span>
             {event.source === 'AGENT' ? (
-              <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300">
                 AI
               </span>
             ) : (
-              <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-brand-mid text-brand-muted">
                 User
               </span>
             )}
           </div>
 
-          <p className="text-sm text-gray-800 mt-0.5">{event.action}</p>
+          <p className="text-xs text-white mt-0.5">{event.action}</p>
 
           {(event.old_value || event.new_value) && (
-            <p className="text-xs text-gray-400 mt-0.5">
+            <p className="text-[10px] text-brand-muted mt-0.5 font-mono">
               {event.old_value ?? '—'} → {event.new_value ?? '—'}
             </p>
           )}
 
           {event.reason && (
-            <p className="text-xs italic text-gray-500 mt-0.5">{event.reason}</p>
+            <p className="text-[10px] italic text-brand-muted mt-0.5">{event.reason}</p>
           )}
         </li>
       ))}
