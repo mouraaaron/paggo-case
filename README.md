@@ -6,26 +6,31 @@ Aplicação full-stack para triagem de ~8.000 tickets de suporte, construída co
 
 ## Funcionalidades
 
-- **Inbox** — tabela filtrável de todos os tickets com badges de triagem e pontuação de risco
+- **Kanban de tickets** — visão em colunas com drag-and-drop, cards coloridos por prioridade (URGENT/HIGH/MEDIUM/LOW) e ordenação por risco
+- **Painel de alertas lateral** — tickets críticos (score ≥ 70) em destaque em tempo real, workload de agentes por prioridade e gráfico de tendências semanais
+- **Prioridade automática** — definida exclusivamente pelo sistema de triagem (não pelo cliente): `≥70 → URGENT`, `40–69 → HIGH`, `10–39 → MEDIUM`, `<10 → LOW`
 - **Detalhe do ticket** — painel de ações completo (mudança de status, classificação, atribuição, respostas, encerramento) com audit log
 - **Agente de IA** — assistente conversacional com GPT-4o-mini e tool calling; exige confirmação humana antes de executar ações de escrita
-- **Motor de regras de triagem** — 5 regras que geram uma pontuação de risco de 0 a 100 por ticket
+- **Motor de regras de triagem** — 6 regras que geram uma pontuação de risco de 0 a 100 por ticket
 - **Máquina de estados** — garante transições de status válidas (transições inválidas retornam HTTP 422)
 - **Audit log** — cada alteração é registrada com ator, origem (USER vs AGENT) e valores anterior/posterior
 
 ## Regras de Triagem
 
-As regras foram desenhadas para não depender da prioridade auto-informada pelo cliente, que costuma ser imprecisa:
+A prioridade é **100% definida pelo sistema** — a prioridade informada pelo cliente é ignorada por ser imprecisa. As duas situações mais críticas para o negócio (churn sem agente e cliente premium sem resposta rápida) geram URGENT diretamente:
 
-| Regra | Condição | Pontos |
-|---|---|---|
-| `SLA_BREACH` | Cliente ENT ou MID sem primeira resposta há mais de 4h | +40 (ENT) / +25 (MID) |
-| `CHURN_SIGNAL` | Palavras de churn no assunto ou corpo ("cancelar", "reembolso", "concorrente"...) | +35 |
-| `URGENT_UNATTENDED` | Prioridade URGENT sem resposta há mais de 4h | +20 |
-| `MULTIPLE_OPEN` | Cliente com 3 ou mais tickets abertos simultaneamente | +15 |
-| `STALE_IN_PROGRESS` | Ticket IN_PROGRESS sem atividade há mais de 72h | +15 |
+| Regra | Condição | Pontos | Flag |
+|---|---|---|---|
+| `CHURN_UNASSIGNED` | Palavras de churn **+** sem agente atribuído | +70 | `CHURN_UNASSIGNED` |
+| `ENT_NO_REPLY_2H` | Cliente ENT sem resposta há mais de 2h | +70 | `ENT_NO_REPLY_2H` |
+| `CHURN_WITH_AGENT` | Palavras de churn + agente atribuído | +35 | `CHURN_SIGNAL` |
+| `MID_NO_REPLY_2H` | Cliente MID sem resposta há mais de 2h | +30 | `MID_NO_REPLY_2H` |
+| `MULTIPLE_OPEN` | Cliente com 3 ou mais tickets abertos simultaneamente | +15 | `MULTIPLE_OPEN` |
+| `STALE_IN_PROGRESS` | Ticket IN_PROGRESS sem atividade há mais de 72h | +15 | `STALE_IN_PROGRESS` |
 
-A pontuação final é a soma dos pontos ativos, limitada a 100. Tickets com qualquer flag ativa aparecem com destaque visual na inbox.
+A pontuação final é a soma dos pontos ativos, limitada a 100. Tickets com score ≥ 70 aparecem automaticamente no painel de alertas lateral.
+
+> **Após mudar regras:** re-execute `python scripts/import_csv.py` para recalcular flags, score e prioridade de todos os tickets (operação idempotente).
 
 ## Ferramentas do Agente de IA
 

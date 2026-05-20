@@ -39,7 +39,9 @@ frontend/ (Next.js, Vercel)
     app/tickets/[id]/page.tsx   → ticket detail (server component)
     app/agent/page.tsx          → AI chat
     components/                 → TicketTable, ActionButtons, AuditLog,
-                                   TicketDetailPanel, AgentChat, TriageBadge
+                                   TicketDetailPanel, AgentChat, TriageBadge,
+                                   KanbanBoard, KanbanCard, KanbanColumn,
+                                   AlertPanel (⚡ Alertas | 👥 Agentes | 📈 Tendências)
     lib/api.ts                  → all fetch calls, single BASE constant
     types/index.ts              → shared TypeScript types
           ↕ HTTP (NEXT_PUBLIC_BACKEND_URL)
@@ -52,7 +54,7 @@ backend/ (FastAPI, Render)
         audit.py                → /tickets/{id}/audit
         agent.py                → /agent/chat
     services/
-        triage_rules.py         → calculate_triage_flags(ticket) → (flags, score)
+        triage_rules.py         → calculate_triage_flags(ticket) → (flags, score, priority)
         state_machine.py        → can_transition(current, target) → (bool, msg)
         audit.py                → log_event(...)
         ai_agent.py             → run_agent(history, message, confirmed_tool_call)
@@ -65,7 +67,17 @@ Supabase (PostgreSQL)
 
 ## Key Design Decisions
 
-**Triage flags are pre-computed at import time** (`scripts/import_csv.py`) and stored in the `tickets` table. They are not recalculated on reads. If triage logic changes, re-run the import script.
+**Triage flags and priority are pre-computed at import time** (`scripts/import_csv.py`) and stored in the `tickets` table. They are not recalculated on reads. If triage logic changes, re-run the import script.
+
+**Priority is system-calculated — never trust the customer-supplied value.** `calculate_triage_flags()` returns `(flags, score, priority)`. Priority is derived from score: `≥70 → URGENT`, `40–69 → HIGH`, `10–39 → MEDIUM`, `<10 → LOW`. The import script overwrites `priority` with the system value on every run.
+
+**Triage rules (6 active rules):**
+- `CHURN_UNASSIGNED` — churn keywords + no agent assigned → **+70**
+- `ENT_NO_REPLY_2H` — ENT segment, no reply, age > 2h → **+70**
+- `CHURN_WITH_AGENT` — churn keywords + agent assigned → **+35** (flag: `CHURN_SIGNAL`)
+- `MID_NO_REPLY_2H` — MID segment, no reply, age > 2h → **+30**
+- `MULTIPLE_OPEN` — customer has ≥3 other open tickets → **+15**
+- `STALE_IN_PROGRESS` — IN_PROGRESS, no activity for 72h → **+15**
 
 **Route ordering matters in FastAPI** — `/tickets/flagged` is registered before `/tickets/{ticket_id}`. Moving it after would cause "flagged" to be matched as a ticket ID.
 
@@ -76,6 +88,10 @@ Supabase (PostgreSQL)
 **Agent write-tool confirmation flow** — when the agent wants to call a write tool (`update_ticket_status`, `assign_ticket`, `classify_ticket`), it returns `pending_action` instead of executing. The frontend shows a confirmation banner; on confirm, the frontend sends `confirmed_action` back and the backend executes it. The `message` field is an empty string on confirm turns — the backend ignores it when `confirmed_action` is set.
 
 **Invalid status transitions return HTTP 422**, not 400. The state machine (`services/state_machine.py`) defines the allowed transitions.
+
+**Alert panel layout** — the inbox page uses a 70/30 split: kanban on the left, `AlertPanel` component on the right. The panel has three tabs: Alertas (tickets with `risk_score ≥ 70`), Agentes (workload table), Tendências (weekly volume chart via `GET /tickets/stats/weekly`).
+
+**Design specs** live in `docs/superpowers/specs/`. See `2026-05-20-risk-scoring-and-leader-ui-design.md` for the full scoring + UI redesign spec.
 
 ## Environment Variables
 
