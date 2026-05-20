@@ -17,6 +17,7 @@ import { canTransition } from '@/lib/stateMachine'
 import { KanbanColumn } from './KanbanColumn'
 import { KanbanCard } from './KanbanCard'
 import { TicketSidePanel } from './TicketSidePanel'
+import { DateRangePicker } from './DateRangePicker'
 
 const COLUMNS = [
   { status: 'NEW', label: 'Novo' },
@@ -230,20 +231,11 @@ export function KanbanBoard() {
           {FLAGS.map(f => <option key={f} value={f}>{f || 'Flag'}</option>)}
         </select>
 
-        <div className="flex items-center gap-1 text-xs">
-          <label className="text-brand-muted whitespace-nowrap">De</label>
-          <input
-            type="date"
-            className="bg-brand-mid border border-brand-border text-brand-muted px-2 py-1.5 rounded text-xs focus:outline-none focus:border-brand-green"
-            onChange={e => setFilter('created_after', e.target.value)}
-          />
-          <label className="text-brand-muted whitespace-nowrap">até</label>
-          <input
-            type="date"
-            className="bg-brand-mid border border-brand-border text-brand-muted px-2 py-1.5 rounded text-xs focus:outline-none focus:border-brand-green"
-            onChange={e => setFilter('created_before', e.target.value)}
-          />
-        </div>
+        <DateRangePicker
+          onRangeChange={(from, to) => {
+            setFilters(f => ({ ...f, created_after: from, created_before: to }))
+          }}
+        />
 
         <div className="flex gap-1 flex-wrap">
           {COLUMNS.map(col => (
