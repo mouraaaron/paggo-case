@@ -5,7 +5,7 @@ import { Ticket } from '@/types'
 import { getTickets, getWeeklyStats, getAgentStats } from '@/lib/api'
 import type { WeeklyStat, AgentStat } from '@/lib/api'
 
-function timeAgo(dateStr: string | null): string {
+export function timeAgo(dateStr: string | null): string {
   if (!dateStr) return '—'
   const diff = (Date.now() - new Date(dateStr).getTime()) / 1000
   if (diff < 3600) return `${Math.floor(diff / 60)}m`
@@ -13,7 +13,7 @@ function timeAgo(dateStr: string | null): string {
   return `${Math.floor(diff / 86400)}d`
 }
 
-function flagLabel(flags: string[]): string {
+export function flagLabel(flags: string[]): string {
   if (flags.includes('CHURN_UNASSIGNED')) return 'CHURN · SEM AGENTE'
   if (flags.includes('ENT_NO_REPLY_2H')) return 'ENT · SEM REPLY'
   if (flags.includes('CHURN_SIGNAL')) return 'CHURN · COM AGENTE'
