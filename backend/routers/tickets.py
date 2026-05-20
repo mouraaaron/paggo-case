@@ -3,6 +3,8 @@ from models import TicketOut, StatusUpdate, ClassifyUpdate, AssignUpdate, ReplyC
 from database import get_db
 from services.state_machine import can_transition
 from services.audit import log_event
+from datetime import datetime
+from collections import defaultdict
 
 router = APIRouter(prefix="/tickets", tags=["tickets"])
 
@@ -70,6 +72,64 @@ def list_agents():
     result = db.table("tickets").select("assigned_to").neq("assigned_to", None).execute()
     agents = sorted({r["assigned_to"] for r in result.data if r["assigned_to"]})
     return agents
+
+
+@router.get("/stats/weekly")
+def get_weekly_stats():
+    db = get_db()
+    result = db.table("tickets").select("created_at,risk_score").execute()
+
+    week_data: dict[str, dict] = defaultdict(lambda: {"total": 0, "urgent": 0})
+    for row in result.data:
+        if not row.get("created_at"):
+            continue
+        try:
+            dt = datetime.fromisoformat(row["created_at"].replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        week = dt.strftime("%G-W%V")
+        week_data[week]["total"] += 1
+        if (row.get("risk_score") or 0) >= 70:
+            week_data[week]["urgent"] += 1
+
+    return [
+        {"week": w, "total": d["total"], "urgent": d["urgent"]}
+        for w, d in sorted(week_data.items())
+    ]
+
+
+@router.get("/stats/agents")
+def get_agent_stats():
+    db = get_db()
+    result = (
+        db.table("tickets")
+        .select("assigned_to,priority,status")
+        .neq("assigned_to", None)
+        .execute()
+    )
+
+    rows = [
+        r for r in result.data
+        if r.get("status") not in ("CLOSED", "RESOLVED")
+    ]
+
+    agent_data: dict[str, dict] = defaultdict(
+        lambda: {"urgent": 0, "high": 0, "medium": 0, "low": 0, "total": 0}
+    )
+    for row in rows:
+        agent = row.get("assigned_to")
+        if not agent:
+            continue
+        p = (row.get("priority") or "LOW").lower()
+        if p not in ("urgent", "high", "medium", "low"):
+            p = "low"
+        agent_data[agent][p] += 1
+        agent_data[agent]["total"] += 1
+
+    return [
+        {"agent": a, **d}
+        for a, d in sorted(agent_data.items(), key=lambda x: -x[1]["total"])
+    ]
 
 
 @router.get("/{ticket_id}", response_model=TicketOut)
