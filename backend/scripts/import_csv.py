@@ -57,9 +57,10 @@ def run():
                 "category": parse_nullable(row["category"]),
                 "previous_open_tickets_for_customer": parse_int(row["previousOpenTicketsForCustomer"]),
             }
-            flags, score = calculate_triage_flags(ticket)
+            flags, score, priority = calculate_triage_flags(ticket)
             ticket["triage_flags"] = flags
             ticket["risk_score"] = score
+            ticket["priority"] = priority
             batch.append(ticket)
 
             if len(batch) >= batch_size:
