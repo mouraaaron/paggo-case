@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Ticket, TicketStatus, TicketPriority, TicketCategory } from '@/types'
 import {
   updateStatus,
@@ -9,8 +9,21 @@ import {
   addReply,
   closeTicket,
   getTicket,
-  getAgents,
 } from '@/lib/api'
+
+const AGENTS = [
+  'Ana Souza',
+  'Bruno Lima',
+  'Carla Mendes',
+  'Diego Cruz',
+  'Erica Tavares',
+  'Felipe Nunes',
+  'Giovana Reis',
+  'Henrique Faria',
+  'Isadora Pinto',
+  'João Vargas',
+  'Karina Melo',
+]
 
 const STATUS_OPTIONS: TicketStatus[] = [
   'NEW',
@@ -58,14 +71,9 @@ export function ActionButtons({ ticket, onUpdate }: ActionButtonsProps) {
   const [classifyLoading, setClassifyLoading] = useState(false)
 
   // Section C — Assign
-  const [agents, setAgents] = useState<string[]>([])
   const [agentName, setAgentName] = useState(ticket.assigned_to ?? '')
   const [assignError, setAssignError] = useState('')
   const [assignLoading, setAssignLoading] = useState(false)
-
-  useEffect(() => {
-    getAgents().then(setAgents).catch(() => {})
-  }, [])
 
   // Section D — Add Reply
   const [replyBody, setReplyBody] = useState('')
@@ -221,7 +229,7 @@ export function ActionButtons({ ticket, onUpdate }: ActionButtonsProps) {
             onChange={(e) => setAgentName(e.target.value)}
           >
             <option value="">— Não atribuído —</option>
-            {agents.map((a) => (
+            {AGENTS.map((a) => (
               <option key={a} value={a}>{a}</option>
             ))}
           </select>
