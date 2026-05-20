@@ -148,3 +148,19 @@ def test_priority_high():
 def test_priority_low_zero_score():
     _, _, priority = calculate_triage_flags(make_ticket())
     assert priority == "LOW"
+
+def test_multiple_open_boundary_below():
+    ticket = make_ticket(previous_open_tickets_for_customer=2)
+    flags, score, _ = calculate_triage_flags(ticket)
+    assert "MULTIPLE_OPEN" not in flags
+    assert score == 0
+
+def test_stale_in_progress_exact_boundary():
+    now = datetime.now(timezone.utc)
+    # 72h minus 1 second: should NOT fire (rule is > 72h, not >= 72h)
+    ticket = make_ticket(
+        status="IN_PROGRESS",
+        last_reply_at=now - timedelta(hours=72) + timedelta(seconds=1),
+    )
+    flags, _, _ = calculate_triage_flags(ticket)
+    assert "STALE_IN_PROGRESS" not in flags

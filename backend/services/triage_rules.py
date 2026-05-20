@@ -41,7 +41,10 @@ def calculate_triage_flags(ticket: dict) -> tuple[list[str], int, str]:
     segment = ticket.get("customer_segment", "")
     status = ticket.get("status", "")
     assigned_to = ticket.get("assigned_to")
-    prev_open = ticket.get("previous_open_tickets_for_customer", 0) or 0
+    try:
+        prev_open = int(ticket.get("previous_open_tickets_for_customer") or 0)
+    except (ValueError, TypeError):
+        prev_open = 0
 
     text = f"{ticket.get('subject', '')} {ticket.get('body_preview', '')}".lower()
     has_churn = any(kw in text for kw in CHURN_KEYWORDS)
@@ -67,7 +70,7 @@ def calculate_triage_flags(ticket: dict) -> tuple[list[str], int, str]:
         score += 30
 
     # Rule 5: MULTIPLE_OPEN — customer has 3+ other open tickets
-    if int(prev_open) >= 3:
+    if prev_open >= 3:
         flags.append("MULTIPLE_OPEN")
         score += 15
 
