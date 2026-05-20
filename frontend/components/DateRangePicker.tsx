@@ -30,10 +30,13 @@ function monthCells(year: number, month: number): (Date | null)[] {
   return cells
 }
 
+const MIN = norm(new Date(2026, 0, 1))   // 1 jan 2026
+const MAX = norm(new Date(2026, 2, 31))  // 31 mar 2026
+
 export function DateRangePicker({ onRangeChange }: DateRangePickerProps) {
   const today = norm(new Date())
   const [open, setOpen] = useState(false)
-  const [view, setView] = useState({ year: today.getFullYear(), month: today.getMonth() })
+  const [view, setView] = useState({ year: 2026, month: 0 })
   const [start, setStart] = useState<Date | null>(null)
   const [end, setEnd] = useState<Date | null>(null)
   const [hover, setHover] = useState<Date | null>(null)
@@ -49,6 +52,7 @@ export function DateRangePicker({ onRangeChange }: DateRangePickerProps) {
 
   function pickDay(day: Date) {
     const d = norm(day)
+    if (d < MIN || d > MAX) return
     if (!start || end) {
       setStart(d)
       setEnd(null)
@@ -71,15 +75,21 @@ export function DateRangePicker({ onRangeChange }: DateRangePickerProps) {
     onRangeChange(undefined, undefined)
   }
 
+  const atMin = view.year === MIN.getFullYear() && view.month === MIN.getMonth()
+  const atMax = view.year === MAX.getFullYear() && view.month === MAX.getMonth()
+
   function prevMonth() {
+    if (atMin) return
     setView(v => v.month === 0 ? { year: v.year - 1, month: 11 } : { ...v, month: v.month - 1 })
   }
   function nextMonth() {
+    if (atMax) return
     setView(v => v.month === 11 ? { year: v.year + 1, month: 0 } : { ...v, month: v.month + 1 })
   }
 
   function dayClass(day: Date) {
     const d = norm(day)
+    if (d < MIN || d > MAX) return 'text-brand-border cursor-not-allowed'
     const s = start ? norm(start) : null
     const e = end ? norm(end) : (start && hover ? norm(hover) : null)
     const isStart = s && d.getTime() === s.getTime()
@@ -141,7 +151,8 @@ export function DateRangePicker({ onRangeChange }: DateRangePickerProps) {
           <div className="flex items-center justify-between px-4 py-2.5">
             <button
               onClick={prevMonth}
-              className="w-6 h-6 flex items-center justify-center rounded text-brand-muted hover:text-white hover:bg-brand-mid cursor-pointer transition-colors"
+              disabled={atMin}
+              className="w-6 h-6 flex items-center justify-center rounded transition-colors disabled:opacity-20 disabled:cursor-not-allowed text-brand-muted hover:text-white hover:bg-brand-mid cursor-pointer"
             >
               <ChevronLeft size={13} />
             </button>
@@ -150,7 +161,8 @@ export function DateRangePicker({ onRangeChange }: DateRangePickerProps) {
             </span>
             <button
               onClick={nextMonth}
-              className="w-6 h-6 flex items-center justify-center rounded text-brand-muted hover:text-white hover:bg-brand-mid cursor-pointer transition-colors"
+              disabled={atMax}
+              className="w-6 h-6 flex items-center justify-center rounded transition-colors disabled:opacity-20 disabled:cursor-not-allowed text-brand-muted hover:text-white hover:bg-brand-mid cursor-pointer"
             >
               <ChevronRight size={13} />
             </button>
