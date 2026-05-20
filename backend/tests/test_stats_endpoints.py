@@ -73,75 +73,116 @@ def _base_ticket(**extra):
     }
 
 
-# ─── Unit: weekly stats grouping logic ────────────────────────────────────────
+# ─── Integration: response-time stats ────────────────────────────────────────
 
-def test_weekly_stats_groups_by_iso_week(monkeypatch):
+def test_response_time_computes_median_per_segment(monkeypatch):
+    # ENT: 3600s and 7200s → median = 5400s
+    # SMB: 1800s only → median = 1800s
     rows = [
-        {"created_at": "2024-01-08T10:00:00+00:00", "risk_score": 20},  # 2024-W02
-        {"created_at": "2024-01-09T10:00:00+00:00", "risk_score": 80},  # 2024-W02
-        {"created_at": "2024-01-15T10:00:00+00:00", "risk_score": 10},  # 2024-W03
+        {"customer_segment": "ENT", "created_at": "2024-01-08T10:00:00+00:00", "last_reply_at": "2024-01-08T11:00:00+00:00"},
+        {"customer_segment": "ENT", "created_at": "2024-01-08T10:00:00+00:00", "last_reply_at": "2024-01-08T12:00:00+00:00"},
+        {"customer_segment": "SMB", "created_at": "2024-01-08T10:00:00+00:00", "last_reply_at": "2024-01-08T10:30:00+00:00"},
     ]
     db, _ = _chainable(rows)
     monkeypatch.setattr(routers.tickets, "get_db", lambda: db)
 
-    resp = client.get("/tickets/stats/weekly")
+    resp = client.get("/tickets/stats/response-time")
     assert resp.status_code == 200
-    by_week = {d["week"]: d for d in resp.json()}
-    assert by_week["2024-W02"]["total"] == 2
-    assert by_week["2024-W03"]["total"] == 1
+    by_seg = {r["segment"]: r for r in resp.json()}
+    assert by_seg["ENT"]["median_seconds"] == 5400
+    assert by_seg["SMB"]["median_seconds"] == 1800
+    assert by_seg["ENT"]["count"] == 2
+    assert by_seg["SMB"]["count"] == 1
 
 
-def test_weekly_stats_counts_urgent_at_70_threshold(monkeypatch):
+def test_response_time_skips_tickets_without_reply(monkeypatch):
     rows = [
-        {"created_at": "2024-01-08T10:00:00+00:00", "risk_score": 70},   # exactly 70 → urgent
-        {"created_at": "2024-01-08T11:00:00+00:00", "risk_score": 69},   # just below
-        {"created_at": "2024-01-08T12:00:00+00:00", "risk_score": 100},
+        {"customer_segment": "ENT", "created_at": "2024-01-08T10:00:00+00:00", "last_reply_at": None},
+        {"customer_segment": "ENT", "created_at": "2024-01-08T10:00:00+00:00", "last_reply_at": "2024-01-08T11:00:00+00:00"},
     ]
     db, _ = _chainable(rows)
+    # neq("last_reply_at", None) is applied by the query, but our mock returns all rows.
+    # The endpoint itself only receives what the DB returns; rows with last_reply_at=None
+    # are filtered by the query builder, but the mock returns all. Test that negative diffs
+    # are not counted.
     monkeypatch.setattr(routers.tickets, "get_db", lambda: db)
 
-    resp = client.get("/tickets/stats/weekly")
+    resp = client.get("/tickets/stats/response-time")
     assert resp.status_code == 200
-    week = resp.json()[0]
-    assert week["total"] == 3
-    assert week["urgent"] == 2   # scores 70 and 100
+    ent = next(r for r in resp.json() if r["segment"] == "ENT")
+    assert ent["count"] == 1
 
 
-def test_weekly_stats_skips_null_created_at(monkeypatch):
+def test_response_time_ignores_unknown_segments(monkeypatch):
     rows = [
-        {"created_at": None, "risk_score": 50},
-        {"created_at": "2024-01-08T10:00:00+00:00", "risk_score": 20},
+        {"customer_segment": "VIP", "created_at": "2024-01-08T10:00:00+00:00", "last_reply_at": "2024-01-08T11:00:00+00:00"},
+        {"customer_segment": "MID", "created_at": "2024-01-08T10:00:00+00:00", "last_reply_at": "2024-01-08T11:00:00+00:00"},
     ]
     db, _ = _chainable(rows)
     monkeypatch.setattr(routers.tickets, "get_db", lambda: db)
 
-    resp = client.get("/tickets/stats/weekly")
+    resp = client.get("/tickets/stats/response-time")
     assert resp.status_code == 200
-    assert len(resp.json()) == 1
-    assert resp.json()[0]["total"] == 1
+    segments = [r["segment"] for r in resp.json()]
+    assert "VIP" not in segments
+    assert "MID" in segments
 
 
-def test_weekly_stats_sorted_chronologically(monkeypatch):
-    rows = [
-        {"created_at": "2024-03-04T10:00:00+00:00", "risk_score": 0},  # 2024-W10
-        {"created_at": "2024-01-08T10:00:00+00:00", "risk_score": 0},  # 2024-W02
-        {"created_at": "2024-02-05T10:00:00+00:00", "risk_score": 0},  # 2024-W06
-    ]
-    db, _ = _chainable(rows)
-    monkeypatch.setattr(routers.tickets, "get_db", lambda: db)
-
-    resp = client.get("/tickets/stats/weekly")
-    weeks = [d["week"] for d in resp.json()]
-    assert weeks == sorted(weeks)
-
-
-def test_weekly_stats_empty_database(monkeypatch):
+def test_response_time_empty_returns_empty_list(monkeypatch):
     db, _ = _chainable([])
     monkeypatch.setattr(routers.tickets, "get_db", lambda: db)
 
-    resp = client.get("/tickets/stats/weekly")
+    resp = client.get("/tickets/stats/response-time")
     assert resp.status_code == 200
     assert resp.json() == []
+
+
+def test_response_time_null_median_when_no_valid_rows_for_segment(monkeypatch):
+    # Segment has a row but diff is negative (reply before creation — bad data)
+    rows = [
+        {"customer_segment": "ENT", "created_at": "2024-01-08T12:00:00+00:00", "last_reply_at": "2024-01-08T10:00:00+00:00"},
+    ]
+    db, _ = _chainable(rows)
+    monkeypatch.setattr(routers.tickets, "get_db", lambda: db)
+
+    resp = client.get("/tickets/stats/response-time")
+    assert resp.status_code == 200
+    # negative diff filtered out → no segment in result
+    assert resp.json() == []
+
+
+def test_response_time_date_filter_sent_to_query(monkeypatch):
+    db, query = _chainable([])
+    monkeypatch.setattr(routers.tickets, "get_db", lambda: db)
+
+    client.get("/tickets/stats/response-time?created_after=2024-01-01&created_before=2024-01-31")
+
+    query.gte.assert_called_once_with("created_at", "2024-01-01")
+    query.lte.assert_called_once_with("created_at", "2024-01-31T23:59:59.999999")
+
+
+def test_response_time_no_date_filter_skips_gte_lte(monkeypatch):
+    db, query = _chainable([])
+    monkeypatch.setattr(routers.tickets, "get_db", lambda: db)
+
+    client.get("/tickets/stats/response-time")
+
+    query.gte.assert_not_called()
+    query.lte.assert_not_called()
+
+
+def test_response_time_sorted_alphabetically(monkeypatch):
+    rows = [
+        {"customer_segment": "SMB", "created_at": "2024-01-08T10:00:00+00:00", "last_reply_at": "2024-01-08T11:00:00+00:00"},
+        {"customer_segment": "ENT", "created_at": "2024-01-08T10:00:00+00:00", "last_reply_at": "2024-01-08T11:00:00+00:00"},
+        {"customer_segment": "MID", "created_at": "2024-01-08T10:00:00+00:00", "last_reply_at": "2024-01-08T11:00:00+00:00"},
+    ]
+    db, _ = _chainable(rows)
+    monkeypatch.setattr(routers.tickets, "get_db", lambda: db)
+
+    resp = client.get("/tickets/stats/response-time")
+    segments = [r["segment"] for r in resp.json()]
+    assert segments == sorted(segments)
 
 
 # ─── Integration: agent stats aggregation ─────────────────────────────────────

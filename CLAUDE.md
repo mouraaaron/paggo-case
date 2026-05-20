@@ -41,7 +41,7 @@ frontend/ (Next.js, Vercel)
     components/                 → TicketTable, ActionButtons, AuditLog,
                                    TicketDetailPanel, AgentChat, TriageBadge,
                                    KanbanBoard, KanbanCard, KanbanColumn,
-                                   AlertPanel (⚡ Alertas | 👥 Agentes | 📈 Tendências)
+                                   AlertPanel (⚡ Alertas | 👥 Agentes | ⏱ Response Time)
     lib/api.ts                  → all fetch calls, single BASE constant
     types/index.ts              → shared TypeScript types
           ↕ HTTP (NEXT_PUBLIC_BACKEND_URL)

@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Ticket } from '@/types'
-import { getTickets, getWeeklyStats, getAgentStats } from '@/lib/api'
-import type { WeeklyStat, AgentStat } from '@/lib/api'
+import { getTickets, getResponseTimeStats, getAgentStats } from '@/lib/api'
+import type { ResponseTimeStat, AgentStat } from '@/lib/api'
 
 export function timeAgo(dateStr: string | null): string {
   if (!dateStr) return '—'
@@ -116,61 +116,84 @@ export function AlertsSidebar({ onTicketClick, createdAfter, createdBefore }: Al
   )
 }
 
-// --- TrendsChart: SVG bar chart used by StatsBottomBar ---
+// --- ResponseTimeChart: horizontal bar chart per segment ---
 
-function TrendsChart({ stats }: { stats: WeeklyStat[] }) {
-  if (stats.length === 0) return <p className="text-xs text-brand-muted text-center py-2">Sem dados</p>
+const SEGMENT_COLORS: Record<string, string> = {
+  ENT: '#C8FF00',
+  MID: '#FB923C',
+  SMB: '#60A5FA',
+}
 
-  const maxTotal = Math.max(...stats.map(s => s.total), 1)
-  const chartH = 80
-  const barW = 6
-  const gap = 2
+function formatDuration(secs: number): string {
+  if (secs < 60) return `${Math.round(secs)}s`
+  if (secs < 3600) return `${Math.round(secs / 60)}min`
+  if (secs < 86400) {
+    const h = Math.floor(secs / 3600)
+    const m = Math.round((secs % 3600) / 60)
+    return m > 0 ? `${h}h ${m}min` : `${h}h`
+  }
+  return `${(secs / 86400).toFixed(1)}d`
+}
 
-  const thisWeek = stats[stats.length - 1]
-  const lastWeek = stats[stats.length - 2]
-  const weekChange = lastWeek && lastWeek.total > 0
-    ? Math.round(((thisWeek?.total ?? 0) - lastWeek.total) / lastWeek.total * 100)
-    : 0
-  const peakTotal = Math.max(...stats.map(s => s.total))
+function ResponseTimeChart({ stats }: { stats: ResponseTimeStat[] }) {
+  const ALL_SEGMENTS = ['ENT', 'MID', 'SMB']
+  const maxVal = Math.max(...stats.map(s => s.median_seconds ?? 0), 1)
+
+  const hasData = stats.some(s => s.median_seconds)
+  if (!hasData) {
+    return <p className="text-xs text-brand-muted text-center py-2">Sem dados</p>
+  }
+
+  const sorted = [...stats].filter(s => s.median_seconds).sort((a, b) => (a.median_seconds ?? 0) - (b.median_seconds ?? 0))
+  const best = sorted[0]
+  const worst = sorted[sorted.length - 1]
 
   return (
-    <div className="flex gap-6 items-start pt-1">
-      <svg
-        height={chartH}
-        viewBox={`0 0 ${stats.length * (barW + gap)} ${chartH}`}
-        preserveAspectRatio="none"
-        className="flex-1 min-w-0"
-      >
-        {stats.map((s, i) => {
-          const h = Math.max(2, Math.round((s.total / maxTotal) * (chartH - 4)))
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-2.5">
+        {ALL_SEGMENTS.map(seg => {
+          const data = stats.find(s => s.segment === seg)
+          const val = data?.median_seconds ?? null
+          const pct = val ? Math.max(3, (val / maxVal) * 100) : 0
+          const color = SEGMENT_COLORS[seg]
           return (
-            <rect
-              key={s.week}
-              x={i * (barW + gap)}
-              y={chartH - h}
-              width={barW}
-              height={h}
-              fill="#C8FF0050"
-              rx={1}
-            />
+            <div key={seg} className="flex items-center gap-3">
+              <span className="text-[10px] font-bold w-8 shrink-0" style={{ color: val ? color : '#555' }}>
+                {seg}
+              </span>
+              <div className="flex-1 h-4 rounded-sm bg-brand-mid/50 overflow-hidden">
+                <div
+                  className="h-full rounded-sm"
+                  style={{
+                    width: `${pct}%`,
+                    backgroundColor: val ? `${color}35` : 'transparent',
+                    borderRight: val ? `2px solid ${color}` : 'none',
+                  }}
+                />
+              </div>
+              <span className="text-[10px] font-mono w-16 text-right shrink-0 text-white">
+                {val ? formatDuration(val) : '—'}
+              </span>
+              <span className="text-[9px] text-brand-border w-10 shrink-0 text-right">
+                n={data?.count ?? 0}
+              </span>
+            </div>
           )
         })}
-      </svg>
-      <div className="flex flex-col gap-3 shrink-0 min-w-[120px]">
-        <div>
-          <p className="text-brand-green text-base font-bold">{peakTotal}</p>
-          <p className="text-[9px] text-brand-muted">pico/semana</p>
-        </div>
-        <div>
-          <p className={`text-base font-bold ${weekChange > 0 ? 'text-brand-error' : 'text-brand-success'}`}>
-            {weekChange > 0 ? '+' : ''}{weekChange}%
-          </p>
-          <p className="text-[9px] text-brand-muted">vs semana anterior</p>
-        </div>
-        <div>
-          <p className="text-brand-error text-base font-bold">{thisWeek?.urgent ?? 0}</p>
-          <p className="text-[9px] text-brand-muted">URGENT esta semana</p>
-        </div>
+      </div>
+      <div className="flex gap-6 pt-1 border-t border-brand-border">
+        {best && (
+          <div>
+            <p className="text-brand-green text-base font-bold">{best.segment}</p>
+            <p className="text-[9px] text-brand-muted">mais rápido</p>
+          </div>
+        )}
+        {worst && worst.segment !== best?.segment && (
+          <div>
+            <p className="text-brand-error text-base font-bold">{worst.segment}</p>
+            <p className="text-[9px] text-brand-muted">mais lento</p>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -186,7 +209,7 @@ interface StatsBottomBarProps {
 
 export function StatsBottomBar({ createdAfter, createdBefore, refreshKey }: StatsBottomBarProps) {
   const [agentStats, setAgentStats] = useState<AgentStat[]>([])
-  const [weeklyStats, setWeeklyStats] = useState<WeeklyStat[]>([])
+  const [responseTimeStats, setResponseTimeStats] = useState<ResponseTimeStat[]>([])
   const [initialLoading, setInitialLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState(false)
@@ -195,7 +218,6 @@ export function StatsBottomBar({ createdAfter, createdBefore, refreshKey }: Stat
   useEffect(() => {
     let cancelled = false
     async function load() {
-      // First load: show full loading screen. Subsequent re-fetches: keep data, show subtle spinner.
       if (!hasData.current) {
         setInitialLoading(true)
       } else {
@@ -203,13 +225,13 @@ export function StatsBottomBar({ createdAfter, createdBefore, refreshKey }: Stat
       }
       setError(false)
       try {
-        const [agents, weekly] = await Promise.all([
+        const [agents, responseTimes] = await Promise.all([
           getAgentStats({ createdAfter, createdBefore }),
-          getWeeklyStats(),
+          getResponseTimeStats({ createdAfter, createdBefore }),
         ])
         if (cancelled) return
         setAgentStats(agents)
-        setWeeklyStats(weekly)
+        setResponseTimeStats(responseTimes)
         hasData.current = true
       } catch {
         if (!cancelled) setError(true)
@@ -294,12 +316,12 @@ export function StatsBottomBar({ createdAfter, createdBefore, refreshKey }: Stat
         )}
       </div>
 
-      {/* Tendências */}
+      {/* Response Time */}
       <div className="flex-1 p-5">
         <p className="text-[10px] text-brand-muted uppercase tracking-wider mb-4 font-semibold">
-          Tendências de volume semanal
+          Mediana de tempo de resposta por segmento
         </p>
-        <TrendsChart stats={weeklyStats} />
+        <ResponseTimeChart stats={responseTimeStats} />
       </div>
     </div>
   )
