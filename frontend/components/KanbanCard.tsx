@@ -20,23 +20,31 @@ function timeAgo(dateStr: string | null): string {
 
 function cardBorderClass(ticket: Ticket): string {
   const unassigned = !ticket.assigned_to
-  if (ticket.risk_score >= 70)
-    return unassigned ? 'border-2 border-dashed border-red-500' : 'border-2 border-red-500'
-  if (ticket.triage_flags.includes('CHURN_SIGNAL'))
-    return unassigned ? 'border-2 border-dashed border-pink-500' : 'border-2 border-pink-500'
+  if (ticket.priority === 'URGENT') {
+    return unassigned
+      ? 'border-2 border-dashed border-red-500'
+      : 'border-2 border-red-500'
+  }
+  if (ticket.priority === 'HIGH') {
+    return unassigned
+      ? 'border-2 border-dashed border-orange-500'
+      : 'border-2 border-orange-500'
+  }
   return unassigned ? 'border border-dashed border-brand-border' : 'border border-brand-border'
 }
 
 function riskBarColor(score: number): string {
-  if (score >= 70) return 'bg-brand-error'
-  if (score >= 30) return 'bg-yellow-400'
-  return 'bg-brand-success'
+  if (score >= 70) return 'bg-red-500'
+  if (score >= 40) return 'bg-orange-400'
+  if (score >= 10) return 'bg-brand-muted'
+  return 'bg-[#333333]'
 }
 
 function riskTextColor(score: number): string {
-  if (score >= 70) return 'text-brand-error'
-  if (score >= 30) return 'text-yellow-400'
-  return 'text-brand-success'
+  if (score >= 70) return 'text-red-400'
+  if (score >= 40) return 'text-orange-400'
+  if (score >= 10) return 'text-brand-muted'
+  return 'text-[#555555]'
 }
 
 export function KanbanCard({ ticket, onClick }: KanbanCardProps) {
@@ -73,11 +81,17 @@ export function KanbanCard({ ticket, onClick }: KanbanCardProps) {
             {ticket.customer_segment}
           </span>
         )}
-        {ticket.priority && ticket.priority !== 'URGENT' && (
-          <span className="text-[9px] px-1.5 py-0.5 rounded bg-brand-mid text-brand-muted">{ticket.priority}</span>
-        )}
         {ticket.priority === 'URGENT' && (
-          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-red-500/15 text-red-400">URGENT 🔥</span>
+          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-red-500/15 text-red-400">URGENT</span>
+        )}
+        {ticket.priority === 'HIGH' && (
+          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-500/15 text-orange-400">HIGH</span>
+        )}
+        {ticket.priority === 'MEDIUM' && (
+          <span className="text-[9px] px-1.5 py-0.5 rounded bg-brand-mid text-brand-muted">MEDIUM</span>
+        )}
+        {ticket.priority === 'LOW' && (
+          <span className="text-[9px] px-1.5 py-0.5 rounded bg-brand-mid text-[#555555]">LOW</span>
         )}
         {isEscalated && (
           <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-500/15 text-orange-400">ESCALADO</span>
