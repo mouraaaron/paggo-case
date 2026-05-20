@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Ticket } from '@/types'
 import { getTickets, getWeeklyStats, getAgentStats } from '@/lib/api'
 import type { WeeklyStat, AgentStat } from '@/lib/api'
@@ -187,13 +187,20 @@ interface StatsBottomBarProps {
 export function StatsBottomBar({ createdAfter, createdBefore, refreshKey }: StatsBottomBarProps) {
   const [agentStats, setAgentStats] = useState<AgentStat[]>([])
   const [weeklyStats, setWeeklyStats] = useState<WeeklyStat[]>([])
-  const [loading, setLoading] = useState(true)
+  const [initialLoading, setInitialLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState(false)
+  const hasData = useRef(false)
 
   useEffect(() => {
     let cancelled = false
     async function load() {
-      setLoading(true)
+      // First load: show full loading screen. Subsequent re-fetches: keep data, show subtle spinner.
+      if (!hasData.current) {
+        setInitialLoading(true)
+      } else {
+        setRefreshing(true)
+      }
       setError(false)
       try {
         const [agents, weekly] = await Promise.all([
@@ -203,17 +210,21 @@ export function StatsBottomBar({ createdAfter, createdBefore, refreshKey }: Stat
         if (cancelled) return
         setAgentStats(agents)
         setWeeklyStats(weekly)
+        hasData.current = true
       } catch {
         if (!cancelled) setError(true)
       } finally {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) {
+          setInitialLoading(false)
+          setRefreshing(false)
+        }
       }
     }
     load()
     return () => { cancelled = true }
   }, [createdAfter, createdBefore, refreshKey])
 
-  if (loading) {
+  if (initialLoading) {
     return (
       <div className="border-t border-brand-border py-10 flex items-center justify-center">
         <p className="text-xs text-brand-muted">Carregando estatísticas...</p>
@@ -221,7 +232,7 @@ export function StatsBottomBar({ createdAfter, createdBefore, refreshKey }: Stat
     )
   }
 
-  if (error) {
+  if (error && !hasData.current) {
     return (
       <div className="border-t border-brand-border py-10 flex items-center justify-center">
         <p className="text-xs text-brand-error">Erro ao carregar estatísticas</p>
@@ -233,9 +244,14 @@ export function StatsBottomBar({ createdAfter, createdBefore, refreshKey }: Stat
     <div className="border-t border-brand-border flex">
       {/* Agentes */}
       <div className="flex-1 border-r border-brand-border p-5">
-        <p className="text-[10px] text-brand-muted uppercase tracking-wider mb-4 font-semibold">
-          Balanceamento de agentes
-        </p>
+        <div className="flex items-center gap-2 mb-4">
+          <p className="text-[10px] text-brand-muted uppercase tracking-wider font-semibold">
+            Balanceamento de agentes
+          </p>
+          {refreshing && (
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-brand-green animate-pulse" />
+          )}
+        </div>
         {agentStats.length === 0 ? (
           <p className="text-xs text-brand-muted py-4">Sem dados para o período selecionado</p>
         ) : (
