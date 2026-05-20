@@ -105,8 +105,12 @@ export function getWeeklyStats(): Promise<WeeklyStat[]> {
   return req<WeeklyStat[]>('/tickets/stats/weekly')
 }
 
-export function getAgentStats(): Promise<AgentStat[]> {
-  return req<AgentStat[]>('/tickets/stats/agents')
+export function getAgentStats(filters?: { createdAfter?: string; createdBefore?: string }): Promise<AgentStat[]> {
+  const params = new URLSearchParams()
+  if (filters?.createdAfter) params.set('created_after', filters.createdAfter)
+  if (filters?.createdBefore) params.set('created_before', filters.createdBefore)
+  const qs = params.toString()
+  return req<AgentStat[]>(`/tickets/stats/agents${qs ? `?${qs}` : ''}`)
 }
 
 // --- Agent ---

@@ -27,9 +27,11 @@ function flagLabel(flags: string[]): string {
 
 interface AlertsSidebarProps {
   onTicketClick: (ticket: Ticket) => void
+  createdAfter?: string
+  createdBefore?: string
 }
 
-export function AlertsSidebar({ onTicketClick }: AlertsSidebarProps) {
+export function AlertsSidebar({ onTicketClick, createdAfter, createdBefore }: AlertsSidebarProps) {
   const [urgentTickets, setUrgentTickets] = useState<Ticket[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -40,7 +42,13 @@ export function AlertsSidebar({ onTicketClick }: AlertsSidebarProps) {
       setLoading(true)
       setError(false)
       try {
-        const tickets = await getTickets({ sort_by: 'risk_score', sort_desc: true, limit: 100 })
+        const tickets = await getTickets({
+          sort_by: 'risk_score',
+          sort_desc: true,
+          limit: 100,
+          created_after: createdAfter,
+          created_before: createdBefore,
+        })
         if (cancelled) return
         setUrgentTickets(
           tickets.filter(t => t.risk_score >= 70 && t.status !== 'CLOSED' && t.status !== 'RESOLVED')
@@ -53,7 +61,7 @@ export function AlertsSidebar({ onTicketClick }: AlertsSidebarProps) {
     }
     load()
     return () => { cancelled = true }
-  }, [])
+  }, [createdAfter, createdBefore])
 
   return (
     <div className="flex flex-col h-full bg-brand-black">
@@ -114,7 +122,7 @@ function TrendsChart({ stats }: { stats: WeeklyStat[] }) {
   if (stats.length === 0) return <p className="text-xs text-brand-muted text-center py-2">Sem dados</p>
 
   const maxTotal = Math.max(...stats.map(s => s.total), 1)
-  const chartH = 52
+  const chartH = 80
   const barW = 6
   const gap = 2
 
@@ -126,7 +134,7 @@ function TrendsChart({ stats }: { stats: WeeklyStat[] }) {
   const peakTotal = Math.max(...stats.map(s => s.total))
 
   return (
-    <div className="flex gap-5 items-center h-full">
+    <div className="flex gap-6 items-start pt-1">
       <svg
         height={chartH}
         viewBox={`0 0 ${stats.length * (barW + gap)} ${chartH}`}
@@ -148,29 +156,34 @@ function TrendsChart({ stats }: { stats: WeeklyStat[] }) {
           )
         })}
       </svg>
-      <div className="flex gap-5 shrink-0">
-        <div className="text-center">
-          <p className="text-brand-green text-sm font-bold">{peakTotal}</p>
-          <p className="text-[9px] text-brand-muted">pico/sem.</p>
+      <div className="flex flex-col gap-3 shrink-0 min-w-[120px]">
+        <div>
+          <p className="text-brand-green text-base font-bold">{peakTotal}</p>
+          <p className="text-[9px] text-brand-muted">pico/semana</p>
         </div>
-        <div className="text-center">
-          <p className={`text-sm font-bold ${weekChange > 0 ? 'text-brand-error' : 'text-brand-success'}`}>
+        <div>
+          <p className={`text-base font-bold ${weekChange > 0 ? 'text-brand-error' : 'text-brand-success'}`}>
             {weekChange > 0 ? '+' : ''}{weekChange}%
           </p>
-          <p className="text-[9px] text-brand-muted">vs anterior</p>
+          <p className="text-[9px] text-brand-muted">vs semana anterior</p>
         </div>
-        <div className="text-center">
-          <p className="text-brand-error text-sm font-bold">{thisWeek?.urgent ?? 0}</p>
-          <p className="text-[9px] text-brand-muted">URGENT/sem.</p>
+        <div>
+          <p className="text-brand-error text-base font-bold">{thisWeek?.urgent ?? 0}</p>
+          <p className="text-[9px] text-brand-muted">URGENT esta semana</p>
         </div>
       </div>
     </div>
   )
 }
 
-// --- StatsBottomBar: horizontal bar below kanban with Agentes + Tendências ---
+// --- StatsBottomBar: horizontal section below kanban with Agentes + Tendências ---
 
-export function StatsBottomBar() {
+interface StatsBottomBarProps {
+  createdAfter?: string
+  createdBefore?: string
+}
+
+export function StatsBottomBar({ createdAfter, createdBefore }: StatsBottomBarProps) {
   const [agentStats, setAgentStats] = useState<AgentStat[]>([])
   const [weeklyStats, setWeeklyStats] = useState<WeeklyStat[]>([])
   const [loading, setLoading] = useState(true)
@@ -182,7 +195,10 @@ export function StatsBottomBar() {
       setLoading(true)
       setError(false)
       try {
-        const [agents, weekly] = await Promise.all([getAgentStats(), getWeeklyStats()])
+        const [agents, weekly] = await Promise.all([
+          getAgentStats({ createdAfter, createdBefore }),
+          getWeeklyStats(),
+        ])
         if (cancelled) return
         setAgentStats(agents)
         setWeeklyStats(weekly)
@@ -194,42 +210,43 @@ export function StatsBottomBar() {
     }
     load()
     return () => { cancelled = true }
-  }, [])
+  }, [createdAfter, createdBefore])
 
   if (loading) {
     return (
-      <div className="h-40 border-t border-brand-border shrink-0 flex items-center justify-center">
-        <p className="text-xs text-brand-muted">Carregando...</p>
+      <div className="border-t border-brand-border py-10 flex items-center justify-center">
+        <p className="text-xs text-brand-muted">Carregando estatísticas...</p>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="h-40 border-t border-brand-border shrink-0 flex items-center justify-center">
+      <div className="border-t border-brand-border py-10 flex items-center justify-center">
         <p className="text-xs text-brand-error">Erro ao carregar estatísticas</p>
       </div>
     )
   }
 
   return (
-    <div className="border-t border-brand-border shrink-0 flex h-44 overflow-hidden">
+    <div className="border-t border-brand-border flex">
       {/* Agentes */}
-      <div className="flex-1 border-r border-brand-border overflow-auto p-3">
-        <p className="text-[9px] text-brand-muted uppercase tracking-wider mb-2 font-semibold">
-          Agentes
+      <div className="flex-1 border-r border-brand-border p-5">
+        <p className="text-[10px] text-brand-muted uppercase tracking-wider mb-4 font-semibold">
+          Balanceamento de agentes
         </p>
         {agentStats.length === 0 ? (
-          <p className="text-xs text-brand-muted text-center py-2">Sem dados</p>
+          <p className="text-xs text-brand-muted py-4">Sem dados para o período selecionado</p>
         ) : (
-          <table className="w-full text-[10px]">
+          <table className="w-full text-xs">
             <thead>
-              <tr className="text-[9px] uppercase">
-                <th className="text-left pb-1.5 font-semibold text-brand-muted">Agente</th>
-                <th className="text-center pb-1.5 font-semibold text-red-400">URG</th>
-                <th className="text-center pb-1.5 font-semibold text-orange-400">HI</th>
-                <th className="text-center pb-1.5 font-semibold text-brand-muted">MED</th>
-                <th className="text-right pb-1.5 font-semibold text-white">Tot</th>
+              <tr className="text-[9px] uppercase border-b border-brand-border">
+                <th className="text-left pb-2 font-semibold text-brand-muted">Agente</th>
+                <th className="text-center pb-2 font-semibold text-red-400">URGENT</th>
+                <th className="text-center pb-2 font-semibold text-orange-400">HIGH</th>
+                <th className="text-center pb-2 font-semibold text-brand-muted">MEDIUM</th>
+                <th className="text-center pb-2 font-semibold text-[#555555]">LOW</th>
+                <th className="text-right pb-2 font-semibold text-white">Total</th>
               </tr>
             </thead>
             <tbody>
@@ -238,17 +255,18 @@ export function StatsBottomBar() {
                 return (
                   <tr
                     key={a.agent}
-                    className={`border-t border-brand-border ${overloaded ? 'bg-red-500/5' : ''}`}
+                    className={`border-b border-brand-border last:border-0 ${overloaded ? 'bg-red-500/5' : ''}`}
                   >
-                    <td className="py-1 text-brand-muted">{a.agent}</td>
-                    <td className={`py-1 text-center ${a.urgent > 0 ? 'text-red-400 font-bold' : 'text-brand-border'}`}>
+                    <td className="py-2 text-white font-medium">{a.agent}</td>
+                    <td className={`py-2 text-center ${a.urgent > 0 ? 'text-red-400 font-bold' : 'text-brand-border'}`}>
                       {a.urgent || '—'}
                     </td>
-                    <td className={`py-1 text-center ${a.high > 0 ? 'text-orange-400' : 'text-brand-border'}`}>
+                    <td className={`py-2 text-center ${a.high > 0 ? 'text-orange-400' : 'text-brand-border'}`}>
                       {a.high || '—'}
                     </td>
-                    <td className="py-1 text-center text-brand-muted">{a.medium || '—'}</td>
-                    <td className={`py-1 text-right font-bold ${overloaded ? 'text-red-400' : 'text-white'}`}>
+                    <td className="py-2 text-center text-brand-muted">{a.medium || '—'}</td>
+                    <td className="py-2 text-center text-[#555555]">{a.low || '—'}</td>
+                    <td className={`py-2 text-right font-bold ${overloaded ? 'text-red-400' : 'text-white'}`}>
                       {a.total}{overloaded ? ' ⚠' : ''}
                     </td>
                   </tr>
@@ -260,13 +278,11 @@ export function StatsBottomBar() {
       </div>
 
       {/* Tendências */}
-      <div className="flex-1 p-3 flex flex-col overflow-hidden">
-        <p className="text-[9px] text-brand-muted uppercase tracking-wider mb-2 font-semibold shrink-0">
-          Tendências
+      <div className="flex-1 p-5">
+        <p className="text-[10px] text-brand-muted uppercase tracking-wider mb-4 font-semibold">
+          Tendências de volume semanal
         </p>
-        <div className="flex-1 min-h-0">
-          <TrendsChart stats={weeklyStats} />
-        </div>
+        <TrendsChart stats={weeklyStats} />
       </div>
     </div>
   )

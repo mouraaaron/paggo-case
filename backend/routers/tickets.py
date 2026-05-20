@@ -99,14 +99,21 @@ def get_weekly_stats():
 
 
 @router.get("/stats/agents")
-def get_agent_stats():
+def get_agent_stats(
+    created_after: str | None = Query(None),
+    created_before: str | None = Query(None),
+):
     db = get_db()
-    result = (
+    query = (
         db.table("tickets")
         .select("assigned_to,priority,status")
         .neq("assigned_to", None)
-        .execute()
     )
+    if created_after:
+        query = query.gte("created_at", created_after)
+    if created_before:
+        query = query.lte("created_at", f"{created_before}T23:59:59.999999")
+    result = query.execute()
 
     rows = [
         r for r in result.data

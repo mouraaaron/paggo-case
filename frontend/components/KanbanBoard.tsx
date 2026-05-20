@@ -207,7 +207,7 @@ export function KanbanBoard() {
   }
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden">
+    <div className="flex flex-col">
       <div className="px-5 py-4 border-b border-brand-border">
         <h1 className="text-lg font-bold text-white">Inbox de Suporte</h1>
         <p className="text-xs text-brand-muted mt-0.5">Tickets ordenados por risco — os mais críticos aparecem primeiro</p>
@@ -276,45 +276,50 @@ export function KanbanBoard() {
         </div>
       </div>
 
-      <div className="flex flex-col flex-1 overflow-hidden min-h-0">
-        {/* Top row: kanban columns + alerts sidebar */}
-        <div className="flex flex-1 overflow-hidden min-h-0">
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-          >
-            <div className="flex gap-3 overflow-x-auto flex-1 px-5 py-4">
-              {COLUMNS.filter(col => visibleStatuses.has(col.status)).map(col => (
-                <KanbanColumn
-                  key={col.status}
-                  status={col.status}
-                  label={col.label}
-                  tickets={columns[col.status] ?? []}
-                  onCardClick={setSelectedTicket}
-                />
-              ))}
-            </div>
-
-            <DragOverlay>
-              {draggingTicket && (
-                <div className="rotate-1 opacity-80 scale-105">
-                  <KanbanCard ticket={draggingTicket} onClick={() => {}} />
-                </div>
-              )}
-            </DragOverlay>
-          </DndContext>
-
-          {/* Alertas sidebar — fixed 320px, vertical */}
-          <div className="w-80 shrink-0 border-l border-brand-border flex flex-col overflow-hidden">
-            <AlertsSidebar onTicketClick={setSelectedTicket} />
+      {/* Top row: kanban columns + alerts sidebar — height fixed to viewport */}
+      <div className="flex h-[calc(100vh-13rem)] min-h-[480px]">
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="flex gap-3 overflow-x-auto flex-1 px-5 py-4">
+            {COLUMNS.filter(col => visibleStatuses.has(col.status)).map(col => (
+              <KanbanColumn
+                key={col.status}
+                status={col.status}
+                label={col.label}
+                tickets={columns[col.status] ?? []}
+                onCardClick={setSelectedTicket}
+              />
+            ))}
           </div>
-        </div>
 
-        {/* Bottom row: Agentes + Tendências, horizontal */}
-        <StatsBottomBar />
+          <DragOverlay>
+            {draggingTicket && (
+              <div className="rotate-1 opacity-80 scale-105">
+                <KanbanCard ticket={draggingTicket} onClick={() => {}} />
+              </div>
+            )}
+          </DragOverlay>
+        </DndContext>
+
+        {/* Alertas sidebar — fixed 320px, vertical, respects date filter */}
+        <div className="w-80 shrink-0 border-l border-brand-border flex flex-col overflow-hidden">
+          <AlertsSidebar
+            onTicketClick={setSelectedTicket}
+            createdAfter={filters.created_after}
+            createdBefore={filters.created_before}
+          />
+        </div>
       </div>
+
+      {/* Bottom section: Agentes + Tendências — grows to full content, page scrolls */}
+      <StatsBottomBar
+        createdAfter={filters.created_after}
+        createdBefore={filters.created_before}
+      />
 
       <TicketSidePanel
         ticket={selectedTicket}
