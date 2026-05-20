@@ -74,48 +74,64 @@ def list_agents():
     return agents
 
 
-@router.get("/stats/response-time")
-def get_response_time_stats(
+@router.get("/stats/volume-by-segment")
+def get_volume_by_segment(
     created_after: str | None = Query(None),
     created_before: str | None = Query(None),
 ):
-    from statistics import median as stat_median
+    OPEN_STATUSES = {"NEW", "TRIAGED", "IN_PROGRESS", "WAITING_CUSTOMER", "ESCALATED", "REOPENED"}
     db = get_db()
-    query = (
-        db.table("tickets")
-        .select("customer_segment,created_at,last_reply_at")
-        .neq("last_reply_at", None)
-        .neq("customer_segment", None)
-    )
+    query = db.table("tickets").select("customer_segment,status").neq("customer_segment", None)
     if created_after:
         query = query.gte("created_at", created_after)
     if created_before:
         query = query.lte("created_at", f"{created_before}T23:59:59.999999")
     result = query.execute()
 
-    by_segment: dict[str, list[float]] = defaultdict(list)
+    by_segment: dict[str, dict] = defaultdict(lambda: {"total": 0, "open": 0, "closed": 0})
     for row in result.data:
-        segment = row.get("customer_segment")
-        if segment not in ("ENT", "MID", "SMB"):
+        seg = row.get("customer_segment")
+        if seg not in ("ENT", "MID", "SMB"):
             continue
-        try:
-            if not row.get("last_reply_at"):
-                continue
-            created = datetime.fromisoformat(row["created_at"].replace("Z", "+00:00"))
-            replied = datetime.fromisoformat(row["last_reply_at"].replace("Z", "+00:00"))
-            diff = (replied - created).total_seconds()
-            if diff > 0:
-                by_segment[segment].append(diff)
-        except (ValueError, TypeError, KeyError):
+        by_segment[seg]["total"] += 1
+        if row.get("status") in OPEN_STATUSES:
+            by_segment[seg]["open"] += 1
+        else:
+            by_segment[seg]["closed"] += 1
+
+    return [
+        {"segment": seg, **d}
+        for seg, d in sorted(by_segment.items())
+    ]
+
+
+@router.get("/stats/risk-by-segment")
+def get_risk_by_segment(
+    created_after: str | None = Query(None),
+    created_before: str | None = Query(None),
+):
+    db = get_db()
+    query = db.table("tickets").select("customer_segment,risk_score").neq("customer_segment", None)
+    if created_after:
+        query = query.gte("created_at", created_after)
+    if created_before:
+        query = query.lte("created_at", f"{created_before}T23:59:59.999999")
+    result = query.execute()
+
+    by_segment: dict[str, list[int]] = defaultdict(list)
+    for row in result.data:
+        seg = row.get("customer_segment")
+        if seg not in ("ENT", "MID", "SMB"):
             continue
+        by_segment[seg].append(row.get("risk_score") or 0)
 
     return [
         {
             "segment": seg,
-            "median_seconds": round(stat_median(times)) if times else None,
-            "count": len(times),
+            "avg_risk": round(sum(scores) / len(scores), 1) if scores else None,
+            "count": len(scores),
         }
-        for seg, times in sorted(by_segment.items())
+        for seg, scores in sorted(by_segment.items())
     ]
 
 

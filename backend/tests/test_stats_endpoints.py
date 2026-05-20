@@ -73,114 +73,175 @@ def _base_ticket(**extra):
     }
 
 
-# ─── Integration: response-time stats ────────────────────────────────────────
+# ─── Integration: volume-by-segment ──────────────────────────────────────────
 
-def test_response_time_computes_median_per_segment(monkeypatch):
-    # ENT: 3600s and 7200s → median = 5400s
-    # SMB: 1800s only → median = 1800s
+OPEN_STATUSES = ["NEW", "TRIAGED", "IN_PROGRESS", "WAITING_CUSTOMER", "ESCALATED", "REOPENED"]
+CLOSED_STATUSES = ["RESOLVED", "CLOSED"]
+
+def test_volume_counts_total_open_closed(monkeypatch):
     rows = [
-        {"customer_segment": "ENT", "created_at": "2024-01-08T10:00:00+00:00", "last_reply_at": "2024-01-08T11:00:00+00:00"},
-        {"customer_segment": "ENT", "created_at": "2024-01-08T10:00:00+00:00", "last_reply_at": "2024-01-08T12:00:00+00:00"},
-        {"customer_segment": "SMB", "created_at": "2024-01-08T10:00:00+00:00", "last_reply_at": "2024-01-08T10:30:00+00:00"},
+        {"customer_segment": "ENT", "status": "NEW"},
+        {"customer_segment": "ENT", "status": "IN_PROGRESS"},
+        {"customer_segment": "ENT", "status": "CLOSED"},
+        {"customer_segment": "SMB", "status": "RESOLVED"},
     ]
     db, _ = _chainable(rows)
     monkeypatch.setattr(routers.tickets, "get_db", lambda: db)
 
-    resp = client.get("/tickets/stats/response-time")
+    resp = client.get("/tickets/stats/volume-by-segment")
     assert resp.status_code == 200
     by_seg = {r["segment"]: r for r in resp.json()}
-    assert by_seg["ENT"]["median_seconds"] == 5400
-    assert by_seg["SMB"]["median_seconds"] == 1800
-    assert by_seg["ENT"]["count"] == 2
-    assert by_seg["SMB"]["count"] == 1
+    assert by_seg["ENT"]["total"] == 3
+    assert by_seg["ENT"]["open"] == 2
+    assert by_seg["ENT"]["closed"] == 1
+    assert by_seg["SMB"]["total"] == 1
+    assert by_seg["SMB"]["open"] == 0
+    assert by_seg["SMB"]["closed"] == 1
 
 
-def test_response_time_skips_tickets_without_reply(monkeypatch):
-    rows = [
-        {"customer_segment": "ENT", "created_at": "2024-01-08T10:00:00+00:00", "last_reply_at": None},
-        {"customer_segment": "ENT", "created_at": "2024-01-08T10:00:00+00:00", "last_reply_at": "2024-01-08T11:00:00+00:00"},
-    ]
-    db, _ = _chainable(rows)
-    # neq("last_reply_at", None) is applied by the query, but our mock returns all rows.
-    # The endpoint itself only receives what the DB returns; rows with last_reply_at=None
-    # are filtered by the query builder, but the mock returns all. Test that negative diffs
-    # are not counted.
-    monkeypatch.setattr(routers.tickets, "get_db", lambda: db)
-
-    resp = client.get("/tickets/stats/response-time")
-    assert resp.status_code == 200
-    ent = next(r for r in resp.json() if r["segment"] == "ENT")
-    assert ent["count"] == 1
-
-
-def test_response_time_ignores_unknown_segments(monkeypatch):
-    rows = [
-        {"customer_segment": "VIP", "created_at": "2024-01-08T10:00:00+00:00", "last_reply_at": "2024-01-08T11:00:00+00:00"},
-        {"customer_segment": "MID", "created_at": "2024-01-08T10:00:00+00:00", "last_reply_at": "2024-01-08T11:00:00+00:00"},
-    ]
+def test_volume_all_open_statuses_counted(monkeypatch):
+    rows = [{"customer_segment": "MID", "status": s} for s in OPEN_STATUSES]
     db, _ = _chainable(rows)
     monkeypatch.setattr(routers.tickets, "get_db", lambda: db)
 
-    resp = client.get("/tickets/stats/response-time")
-    assert resp.status_code == 200
+    resp = client.get("/tickets/stats/volume-by-segment")
+    by_seg = {r["segment"]: r for r in resp.json()}
+    assert by_seg["MID"]["open"] == len(OPEN_STATUSES)
+    assert by_seg["MID"]["closed"] == 0
+
+
+def test_volume_closed_statuses_not_counted_as_open(monkeypatch):
+    rows = [{"customer_segment": "ENT", "status": s} for s in CLOSED_STATUSES]
+    db, _ = _chainable(rows)
+    monkeypatch.setattr(routers.tickets, "get_db", lambda: db)
+
+    resp = client.get("/tickets/stats/volume-by-segment")
+    by_seg = {r["segment"]: r for r in resp.json()}
+    assert by_seg["ENT"]["open"] == 0
+    assert by_seg["ENT"]["closed"] == len(CLOSED_STATUSES)
+
+
+def test_volume_ignores_unknown_segments(monkeypatch):
+    rows = [
+        {"customer_segment": "VIP", "status": "NEW"},
+        {"customer_segment": "ENT", "status": "NEW"},
+    ]
+    db, _ = _chainable(rows)
+    monkeypatch.setattr(routers.tickets, "get_db", lambda: db)
+
+    resp = client.get("/tickets/stats/volume-by-segment")
     segments = [r["segment"] for r in resp.json()]
     assert "VIP" not in segments
-    assert "MID" in segments
+    assert "ENT" in segments
 
 
-def test_response_time_empty_returns_empty_list(monkeypatch):
-    db, _ = _chainable([])
-    monkeypatch.setattr(routers.tickets, "get_db", lambda: db)
-
-    resp = client.get("/tickets/stats/response-time")
-    assert resp.status_code == 200
-    assert resp.json() == []
-
-
-def test_response_time_null_median_when_no_valid_rows_for_segment(monkeypatch):
-    # Segment has a row but diff is negative (reply before creation — bad data)
-    rows = [
-        {"customer_segment": "ENT", "created_at": "2024-01-08T12:00:00+00:00", "last_reply_at": "2024-01-08T10:00:00+00:00"},
-    ]
-    db, _ = _chainable(rows)
-    monkeypatch.setattr(routers.tickets, "get_db", lambda: db)
-
-    resp = client.get("/tickets/stats/response-time")
-    assert resp.status_code == 200
-    # negative diff filtered out → no segment in result
-    assert resp.json() == []
-
-
-def test_response_time_date_filter_sent_to_query(monkeypatch):
+def test_volume_date_filter_sent_to_query(monkeypatch):
     db, query = _chainable([])
     monkeypatch.setattr(routers.tickets, "get_db", lambda: db)
 
-    client.get("/tickets/stats/response-time?created_after=2024-01-01&created_before=2024-01-31")
+    client.get("/tickets/stats/volume-by-segment?created_after=2024-01-01&created_before=2024-01-31")
 
     query.gte.assert_called_once_with("created_at", "2024-01-01")
     query.lte.assert_called_once_with("created_at", "2024-01-31T23:59:59.999999")
 
 
-def test_response_time_no_date_filter_skips_gte_lte(monkeypatch):
-    db, query = _chainable([])
+def test_volume_empty_returns_empty_list(monkeypatch):
+    db, _ = _chainable([])
     monkeypatch.setattr(routers.tickets, "get_db", lambda: db)
 
-    client.get("/tickets/stats/response-time")
+    resp = client.get("/tickets/stats/volume-by-segment")
+    assert resp.status_code == 200
+    assert resp.json() == []
 
-    query.gte.assert_not_called()
-    query.lte.assert_not_called()
 
-
-def test_response_time_sorted_alphabetically(monkeypatch):
+def test_volume_sorted_alphabetically(monkeypatch):
     rows = [
-        {"customer_segment": "SMB", "created_at": "2024-01-08T10:00:00+00:00", "last_reply_at": "2024-01-08T11:00:00+00:00"},
-        {"customer_segment": "ENT", "created_at": "2024-01-08T10:00:00+00:00", "last_reply_at": "2024-01-08T11:00:00+00:00"},
-        {"customer_segment": "MID", "created_at": "2024-01-08T10:00:00+00:00", "last_reply_at": "2024-01-08T11:00:00+00:00"},
+        {"customer_segment": "SMB", "status": "NEW"},
+        {"customer_segment": "ENT", "status": "NEW"},
+        {"customer_segment": "MID", "status": "NEW"},
     ]
     db, _ = _chainable(rows)
     monkeypatch.setattr(routers.tickets, "get_db", lambda: db)
 
-    resp = client.get("/tickets/stats/response-time")
+    resp = client.get("/tickets/stats/volume-by-segment")
+    segments = [r["segment"] for r in resp.json()]
+    assert segments == sorted(segments)
+
+
+# ─── Integration: risk-by-segment ────────────────────────────────────────────
+
+def test_risk_computes_average_per_segment(monkeypatch):
+    rows = [
+        {"customer_segment": "ENT", "risk_score": 80},
+        {"customer_segment": "ENT", "risk_score": 60},
+        {"customer_segment": "SMB", "risk_score": 20},
+    ]
+    db, _ = _chainable(rows)
+    monkeypatch.setattr(routers.tickets, "get_db", lambda: db)
+
+    resp = client.get("/tickets/stats/risk-by-segment")
+    assert resp.status_code == 200
+    by_seg = {r["segment"]: r for r in resp.json()}
+    assert by_seg["ENT"]["avg_risk"] == 70.0
+    assert by_seg["ENT"]["count"] == 2
+    assert by_seg["SMB"]["avg_risk"] == 20.0
+
+
+def test_risk_null_score_treated_as_zero(monkeypatch):
+    rows = [
+        {"customer_segment": "MID", "risk_score": None},
+        {"customer_segment": "MID", "risk_score": 40},
+    ]
+    db, _ = _chainable(rows)
+    monkeypatch.setattr(routers.tickets, "get_db", lambda: db)
+
+    resp = client.get("/tickets/stats/risk-by-segment")
+    by_seg = {r["segment"]: r for r in resp.json()}
+    assert by_seg["MID"]["avg_risk"] == 20.0   # (0 + 40) / 2
+
+
+def test_risk_ignores_unknown_segments(monkeypatch):
+    rows = [
+        {"customer_segment": "VIP", "risk_score": 90},
+        {"customer_segment": "ENT", "risk_score": 50},
+    ]
+    db, _ = _chainable(rows)
+    monkeypatch.setattr(routers.tickets, "get_db", lambda: db)
+
+    resp = client.get("/tickets/stats/risk-by-segment")
+    segments = [r["segment"] for r in resp.json()]
+    assert "VIP" not in segments
+
+
+def test_risk_date_filter_sent_to_query(monkeypatch):
+    db, query = _chainable([])
+    monkeypatch.setattr(routers.tickets, "get_db", lambda: db)
+
+    client.get("/tickets/stats/risk-by-segment?created_after=2024-01-01&created_before=2024-01-31")
+
+    query.gte.assert_called_once_with("created_at", "2024-01-01")
+    query.lte.assert_called_once_with("created_at", "2024-01-31T23:59:59.999999")
+
+
+def test_risk_empty_returns_empty_list(monkeypatch):
+    db, _ = _chainable([])
+    monkeypatch.setattr(routers.tickets, "get_db", lambda: db)
+
+    resp = client.get("/tickets/stats/risk-by-segment")
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+def test_risk_sorted_alphabetically(monkeypatch):
+    rows = [
+        {"customer_segment": "SMB", "risk_score": 10},
+        {"customer_segment": "ENT", "risk_score": 70},
+        {"customer_segment": "MID", "risk_score": 40},
+    ]
+    db, _ = _chainable(rows)
+    monkeypatch.setattr(routers.tickets, "get_db", lambda: db)
+
+    resp = client.get("/tickets/stats/risk-by-segment")
     segments = [r["segment"] for r in resp.json()]
     assert segments == sorted(segments)
 

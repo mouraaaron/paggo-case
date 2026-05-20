@@ -101,12 +101,20 @@ export function mergeTickets(primaryId: string, secondaryId: string): Promise<Ti
   })
 }
 
-export function getResponseTimeStats(filters?: { createdAfter?: string; createdBefore?: string }): Promise<ResponseTimeStat[]> {
+export function getVolumeBySegment(filters?: { createdAfter?: string; createdBefore?: string }): Promise<SegmentVolumeStat[]> {
   const params = new URLSearchParams()
   if (filters?.createdAfter) params.set('created_after', filters.createdAfter)
   if (filters?.createdBefore) params.set('created_before', filters.createdBefore)
   const qs = params.toString()
-  return req<ResponseTimeStat[]>(`/tickets/stats/response-time${qs ? `?${qs}` : ''}`)
+  return req<SegmentVolumeStat[]>(`/tickets/stats/volume-by-segment${qs ? `?${qs}` : ''}`)
+}
+
+export function getRiskBySegment(filters?: { createdAfter?: string; createdBefore?: string }): Promise<SegmentRiskStat[]> {
+  const params = new URLSearchParams()
+  if (filters?.createdAfter) params.set('created_after', filters.createdAfter)
+  if (filters?.createdBefore) params.set('created_before', filters.createdBefore)
+  const qs = params.toString()
+  return req<SegmentRiskStat[]>(`/tickets/stats/risk-by-segment${qs ? `?${qs}` : ''}`)
 }
 
 export function getAgentStats(filters?: { createdAfter?: string; createdBefore?: string }): Promise<AgentStat[]> {
@@ -131,9 +139,16 @@ export interface AgentPendingAction {
   tool_call_id: string;
 }
 
-export interface ResponseTimeStat {
+export interface SegmentVolumeStat {
   segment: string
-  median_seconds: number | null
+  total: number
+  open: number
+  closed: number
+}
+
+export interface SegmentRiskStat {
+  segment: string
+  avg_risk: number | null
   count: number
 }
 

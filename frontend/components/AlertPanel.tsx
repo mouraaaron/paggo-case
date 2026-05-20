@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Ticket } from '@/types'
-import { getTickets, getResponseTimeStats, getAgentStats } from '@/lib/api'
-import type { ResponseTimeStat, AgentStat } from '@/lib/api'
+import { getTickets, getVolumeBySegment, getRiskBySegment, getAgentStats } from '@/lib/api'
+import type { SegmentVolumeStat, SegmentRiskStat, AgentStat } from '@/lib/api'
 
 export function timeAgo(dateStr: string | null): string {
   if (!dateStr) return '—'
@@ -116,7 +116,7 @@ export function AlertsSidebar({ onTicketClick, createdAfter, createdBefore }: Al
   )
 }
 
-// --- ResponseTimeChart: horizontal bar chart per segment ---
+// --- shared segment color palette ---
 
 const SEGMENT_COLORS: Record<string, string> = {
   ENT: '#C8FF00',
@@ -124,82 +124,111 @@ const SEGMENT_COLORS: Record<string, string> = {
   SMB: '#60A5FA',
 }
 
-function formatDuration(secs: number): string {
-  if (secs < 60) return `${Math.round(secs)}s`
-  if (secs < 3600) return `${Math.round(secs / 60)}min`
-  if (secs < 86400) {
-    const h = Math.floor(secs / 3600)
-    const m = Math.round((secs % 3600) / 60)
-    return m > 0 ? `${h}h ${m}min` : `${h}h`
-  }
-  return `${(secs / 86400).toFixed(1)}d`
-}
+const ALL_SEGMENTS = ['ENT', 'MID', 'SMB']
 
-function ResponseTimeChart({ stats }: { stats: ResponseTimeStat[] }) {
-  const ALL_SEGMENTS = ['ENT', 'MID', 'SMB']
-  const maxVal = Math.max(...stats.map(s => s.median_seconds ?? 0), 1)
+// --- VolumeBySegmentChart ---
 
-  const hasData = stats.some(s => s.median_seconds)
-  if (!hasData) {
+function VolumeBySegmentChart({ stats }: { stats: SegmentVolumeStat[] }) {
+  const maxTotal = Math.max(...stats.map(s => s.total), 1)
+
+  if (stats.length === 0 || stats.every(s => s.total === 0)) {
     return <p className="text-xs text-brand-muted text-center py-2">Sem dados</p>
   }
 
-  const sorted = [...stats].filter(s => s.median_seconds).sort((a, b) => (a.median_seconds ?? 0) - (b.median_seconds ?? 0))
-  const best = sorted[0]
-  const worst = sorted[sorted.length - 1]
-
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-2.5">
-        {ALL_SEGMENTS.map(seg => {
-          const data = stats.find(s => s.segment === seg)
-          const val = data?.median_seconds ?? null
-          const pct = val ? Math.max(3, (val / maxVal) * 100) : 0
-          const color = SEGMENT_COLORS[seg]
-          return (
-            <div key={seg} className="flex items-center gap-3">
-              <span className="text-[10px] font-bold w-8 shrink-0" style={{ color: val ? color : '#555' }}>
-                {seg}
-              </span>
-              <div className="flex-1 h-4 rounded-sm bg-brand-mid/50 overflow-hidden">
-                <div
-                  className="h-full rounded-sm"
-                  style={{
-                    width: `${pct}%`,
-                    backgroundColor: val ? `${color}35` : 'transparent',
-                    borderRight: val ? `2px solid ${color}` : 'none',
-                  }}
-                />
-              </div>
-              <span className="text-[10px] font-mono w-16 text-right shrink-0 text-white">
-                {val ? formatDuration(val) : '—'}
-              </span>
-              <span className="text-[9px] text-brand-border w-10 shrink-0 text-right">
-                n={data?.count ?? 0}
-              </span>
+    <div className="flex flex-col gap-2.5">
+      {ALL_SEGMENTS.map(seg => {
+        const data = stats.find(s => s.segment === seg)
+        const total = data?.total ?? 0
+        const open = data?.open ?? 0
+        const color = SEGMENT_COLORS[seg]
+        const totalPct = total > 0 ? Math.max(3, (total / maxTotal) * 100) : 0
+        const openPct = total > 0 ? (open / total) * 100 : 0
+
+        return (
+          <div key={seg} className="flex items-center gap-3">
+            <span className="text-[10px] font-bold w-8 shrink-0" style={{ color: total > 0 ? color : '#555' }}>
+              {seg}
+            </span>
+            <div className="flex-1 h-4 rounded-sm bg-brand-mid/50 overflow-hidden">
+              {total > 0 && (
+                <div className="flex h-full" style={{ width: `${totalPct}%` }}>
+                  <div className="h-full" style={{ width: `${openPct}%`, backgroundColor: `${color}70` }} />
+                  <div className="h-full flex-1" style={{ backgroundColor: `${color}20` }} />
+                </div>
+              )}
             </div>
-          )
-        })}
-      </div>
-      <div className="flex gap-6 pt-1 border-t border-brand-border">
-        {best && (
-          <div>
-            <p className="text-brand-green text-base font-bold">{best.segment}</p>
-            <p className="text-[9px] text-brand-muted">mais rápido</p>
+            <span className="text-[10px] font-mono w-8 text-right shrink-0 text-white font-bold">
+              {total || '—'}
+            </span>
+            <span className="text-[9px] text-brand-border w-20 shrink-0 text-right">
+              {total > 0 ? `${open} abertos` : ''}
+            </span>
           </div>
-        )}
-        {worst && worst.segment !== best?.segment && (
-          <div>
-            <p className="text-brand-error text-base font-bold">{worst.segment}</p>
-            <p className="text-[9px] text-brand-muted">mais lento</p>
-          </div>
-        )}
-      </div>
+        )
+      })}
+      <p className="text-[8px] text-brand-border pt-0.5">
+        barra: <span style={{ color: '#C8FF0070' }}>■</span> abertos + <span style={{ color: '#C8FF0020' }}>■</span> fechados
+      </p>
     </div>
   )
 }
 
-// --- StatsBottomBar: horizontal section below kanban with Agentes + Tendências ---
+// --- RiskBySegmentChart ---
+
+function riskColor(score: number): string {
+  if (score >= 60) return '#FF5252'
+  if (score >= 30) return '#FB923C'
+  return '#C8FF00'
+}
+
+function RiskBySegmentChart({ stats }: { stats: SegmentRiskStat[] }) {
+  const maxRisk = Math.max(...stats.map(s => s.avg_risk ?? 0), 1)
+
+  if (stats.length === 0 || stats.every(s => s.avg_risk === null)) {
+    return <p className="text-xs text-brand-muted text-center py-2">Sem dados</p>
+  }
+
+  return (
+    <div className="flex flex-col gap-2.5">
+      {ALL_SEGMENTS.map(seg => {
+        const data = stats.find(s => s.segment === seg)
+        const val = data?.avg_risk ?? null
+        const pct = val !== null ? Math.max(3, (val / maxRisk) * 100) : 0
+        const color = val !== null ? riskColor(val) : '#333'
+
+        return (
+          <div key={seg} className="flex items-center gap-3">
+            <span className="text-[10px] font-bold w-8 shrink-0 text-brand-muted">
+              {seg}
+            </span>
+            <div className="flex-1 h-4 rounded-sm bg-brand-mid/50 overflow-hidden">
+              <div
+                className="h-full rounded-sm"
+                style={{
+                  width: `${pct}%`,
+                  backgroundColor: `${color}35`,
+                  borderRight: val !== null ? `2px solid ${color}` : 'none',
+                }}
+              />
+            </div>
+            <span className="text-[10px] font-mono w-8 text-right shrink-0 font-bold" style={{ color: val !== null ? color : '#555' }}>
+              {val !== null ? val.toFixed(1) : '—'}
+            </span>
+            <span className="text-[9px] text-brand-border w-12 shrink-0 text-right">
+              n={data?.count ?? 0}
+            </span>
+          </div>
+        )
+      })}
+      <p className="text-[8px] text-brand-border pt-0.5">
+        <span className="text-brand-green">■</span> baixo · <span style={{ color: '#FB923C' }}>■</span> médio · <span className="text-brand-error">■</span> alto
+      </p>
+    </div>
+  )
+}
+
+// --- StatsBottomBar: horizontal section below kanban with Agentes + Response Time ---
 
 interface StatsBottomBarProps {
   createdAfter?: string
@@ -209,7 +238,8 @@ interface StatsBottomBarProps {
 
 export function StatsBottomBar({ createdAfter, createdBefore, refreshKey }: StatsBottomBarProps) {
   const [agentStats, setAgentStats] = useState<AgentStat[]>([])
-  const [responseTimeStats, setResponseTimeStats] = useState<ResponseTimeStat[]>([])
+  const [volumeStats, setVolumeStats] = useState<SegmentVolumeStat[]>([])
+  const [riskStats, setRiskStats] = useState<SegmentRiskStat[]>([])
   const [initialLoading, setInitialLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState(false)
@@ -225,13 +255,15 @@ export function StatsBottomBar({ createdAfter, createdBefore, refreshKey }: Stat
       }
       setError(false)
       try {
-        const [agents, responseTimes] = await Promise.all([
+        const [agents, volume, risk] = await Promise.all([
           getAgentStats({ createdAfter, createdBefore }),
-          getResponseTimeStats({ createdAfter, createdBefore }),
+          getVolumeBySegment({ createdAfter, createdBefore }),
+          getRiskBySegment({ createdAfter, createdBefore }),
         ])
         if (cancelled) return
         setAgentStats(agents)
-        setResponseTimeStats(responseTimes)
+        setVolumeStats(volume)
+        setRiskStats(risk)
         hasData.current = true
       } catch {
         if (!cancelled) setError(true)
@@ -316,12 +348,25 @@ export function StatsBottomBar({ createdAfter, createdBefore, refreshKey }: Stat
         )}
       </div>
 
-      {/* Response Time */}
+      {/* Volume por Segmento */}
+      <div className="flex-1 border-r border-brand-border p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <p className="text-[10px] text-brand-muted uppercase tracking-wider font-semibold">
+            Volume por segmento
+          </p>
+          {refreshing && (
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-brand-green animate-pulse" />
+          )}
+        </div>
+        <VolumeBySegmentChart stats={volumeStats} />
+      </div>
+
+      {/* Score de Risco por Segmento */}
       <div className="flex-1 p-5">
         <p className="text-[10px] text-brand-muted uppercase tracking-wider mb-4 font-semibold">
-          Mediana de tempo de resposta por segmento
+          Score de risco médio por segmento
         </p>
-        <ResponseTimeChart stats={responseTimeStats} />
+        <RiskBySegmentChart stats={riskStats} />
       </div>
     </div>
   )
