@@ -200,16 +200,14 @@ def get_faq_count(
     created_before: str | None = Query(None),
 ):
     db = get_db()
-    total_q = db.table("tickets").select("ticket_id")
-    faq_q = db.table("tickets").select("ticket_id").eq("is_faq", True)
+    q = db.table("tickets").select("is_faq")
     if created_after:
-        total_q = total_q.gte("created_at", created_after)
-        faq_q = faq_q.gte("created_at", created_after)
+        q = q.gte("created_at", created_after)
     if created_before:
-        total_q = total_q.lte("created_at", f"{created_before}T23:59:59.999999")
-        faq_q = faq_q.lte("created_at", f"{created_before}T23:59:59.999999")
-    total = len(total_q.execute().data)
-    faq_count = len(faq_q.execute().data)
+        q = q.lte("created_at", f"{created_before}T23:59:59.999999")
+    rows = q.execute().data
+    total = len(rows)
+    faq_count = sum(1 for r in rows if r.get("is_faq"))
     percentage = round(faq_count / total * 100, 1) if total > 0 else 0.0
     return {"faq_count": faq_count, "total": total, "percentage": percentage}
 

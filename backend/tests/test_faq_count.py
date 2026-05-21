@@ -30,9 +30,8 @@ def _sequential(responses):
 
 
 def test_faq_count_shape(monkeypatch):
-    all_rows = [{"ticket_id": f"T{i}"} for i in range(10)]
-    faq_rows = [{"ticket_id": "T1"}, {"ticket_id": "T2"}]
-    db = _sequential([all_rows, faq_rows])
+    rows = [{"is_faq": True}, {"is_faq": True}] + [{"is_faq": False}] * 8
+    db = _sequential([rows])
     monkeypatch.setattr(routers.tickets, "get_db", lambda: db)
 
     resp = client.get("/tickets/stats/faq-count")
@@ -44,7 +43,7 @@ def test_faq_count_shape(monkeypatch):
 
 
 def test_faq_count_zero_total(monkeypatch):
-    db = _sequential([[], []])
+    db = _sequential([[]])
     monkeypatch.setattr(routers.tickets, "get_db", lambda: db)
 
     resp = client.get("/tickets/stats/faq-count")
@@ -56,9 +55,8 @@ def test_faq_count_zero_total(monkeypatch):
 
 
 def test_faq_count_with_date_filter(monkeypatch):
-    all_rows = [{"ticket_id": f"T{i}"} for i in range(3)]
-    faq_rows = [{"ticket_id": "T0"}]
-    db = _sequential([all_rows, faq_rows])
+    rows = [{"is_faq": True}, {"is_faq": False}, {"is_faq": False}]
+    db = _sequential([rows])
     monkeypatch.setattr(routers.tickets, "get_db", lambda: db)
 
     resp = client.get("/tickets/stats/faq-count?created_after=2026-05-01&created_before=2026-05-10")
@@ -70,9 +68,8 @@ def test_faq_count_with_date_filter(monkeypatch):
 
 
 def test_faq_count_percentage_calculation(monkeypatch):
-    all_rows = [{"ticket_id": f"T{i}"} for i in range(4)]
-    faq_rows = [{"ticket_id": "T0"}, {"ticket_id": "T1"}]
-    db = _sequential([all_rows, faq_rows])
+    rows = [{"is_faq": True}, {"is_faq": True}, {"is_faq": False}, {"is_faq": False}]
+    db = _sequential([rows])
     monkeypatch.setattr(routers.tickets, "get_db", lambda: db)
 
     resp = client.get("/tickets/stats/faq-count")
