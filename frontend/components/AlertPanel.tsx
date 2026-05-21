@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Ticket } from '@/types'
-import { getTickets, getVolumeBySegment, getRiskBySegment, getAgentStats, getMorningBriefing } from '@/lib/api'
-import type { SegmentVolumeStat, SegmentRiskStat, AgentStat, MorningBriefingData } from '@/lib/api'
+import { getTickets, getVolumeBySegment, getRiskBySegment, getAgentStats, getMorningBriefing, getFaqCount } from '@/lib/api'
+import type { SegmentVolumeStat, SegmentRiskStat, AgentStat, MorningBriefingData, FaqCountData } from '@/lib/api'
 import { MorningBriefingModal } from '@/components/MorningBriefingModal'
 
 export function timeAgo(dateStr: string | null): string {
@@ -252,6 +252,8 @@ export function StatsBottomBar({ createdAfter, createdBefore, refreshKey }: Stat
   const [error, setError] = useState(false)
   const hasData = useRef(false)
 
+  const [faqStats, setFaqStats] = useState<FaqCountData>({ faq_count: 0, total: 0, percentage: 0 })
+
   const [briefingData, setBriefingData] = useState<MorningBriefingData | null>(null)
   const [briefingOpen, setBriefingOpen] = useState(false)
   const [briefingLoading, setBriefingLoading] = useState(false)
@@ -293,15 +295,17 @@ export function StatsBottomBar({ createdAfter, createdBefore, refreshKey }: Stat
       }
       setError(false)
       try {
-        const [agents, volume, risk] = await Promise.all([
+        const [agents, volume, risk, faq] = await Promise.all([
           getAgentStats({ createdAfter, createdBefore }),
           getVolumeBySegment({ createdAfter, createdBefore }),
           getRiskBySegment({ createdAfter, createdBefore }),
+          getFaqCount({ createdAfter, createdBefore }),
         ])
         if (cancelled) return
         setAgentStats(agents)
         setVolumeStats(volume)
         setRiskStats(risk)
+        setFaqStats(faq)
         hasData.current = true
       } catch {
         if (!cancelled) setError(true)
@@ -428,11 +432,44 @@ export function StatsBottomBar({ createdAfter, createdBefore, refreshKey }: Stat
       </div>
 
       {/* Score de Risco por Segmento */}
-      <div className="flex-1 p-5">
+      <div className="flex-1 border-r border-brand-border p-5">
         <p className="text-[10px] text-brand-muted uppercase tracking-wider mb-4 font-semibold">
           Score de risco médio por segmento
         </p>
         <RiskBySegmentChart stats={riskStats} />
+      </div>
+
+      {/* Tickets FAQ */}
+      <div className="flex-1 p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <p className="text-[10px] text-brand-muted uppercase tracking-wider font-semibold">
+            Tickets FAQ
+          </p>
+          {refreshing && (
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-brand-green animate-pulse" />
+          )}
+        </div>
+        {faqStats.total === 0 ? (
+          <p className="text-xs text-brand-muted py-4">Sem dados para o período selecionado</p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <div>
+              <span className="text-3xl font-bold text-white">
+                {faqStats.faq_count.toLocaleString('pt-BR')}
+              </span>
+              <span className="text-sm text-brand-muted ml-2">tickets</span>
+            </div>
+            <div>
+              <span className="text-xl font-semibold text-brand-green">
+                {faqStats.percentage.toFixed(1).replace('.', ',')}%
+              </span>
+              <span className="text-xs text-brand-muted ml-2">do total</span>
+            </div>
+            <p className="text-[9px] text-brand-border mt-1">
+              perguntas simples sem necessidade de ação humana
+            </p>
+          </div>
+        )}
       </div>
     </div>
     </>

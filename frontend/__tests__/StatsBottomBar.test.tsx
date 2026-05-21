@@ -7,9 +7,11 @@ vi.mock('@/lib/api', () => ({
   getAgentStats: vi.fn(),
   getVolumeBySegment: vi.fn(),
   getRiskBySegment: vi.fn(),
+  getFaqCount: vi.fn(),
+  getMorningBriefing: vi.fn(),
 }))
 
-import { getAgentStats, getVolumeBySegment, getRiskBySegment } from '@/lib/api'
+import { getAgentStats, getVolumeBySegment, getRiskBySegment, getFaqCount } from '@/lib/api'
 
 const mockAgentStats: AgentStat[] = [
   { agent: 'Ana Souza', urgent: 1, high: 2, medium: 0, low: 0, total: 3 },
@@ -31,6 +33,7 @@ const mockRiskStats: SegmentRiskStat[] = [
 describe('StatsBottomBar', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(getFaqCount).mockResolvedValue({ faq_count: 0, total: 0, percentage: 0 })
   })
 
   it('shows loading state on first render', () => {
@@ -173,7 +176,36 @@ describe('StatsBottomBar', () => {
     render(<StatsBottomBar />)
 
     await waitFor(() => {
-      expect(screen.getByText('Sem dados para o período selecionado')).toBeInTheDocument()
+      expect(screen.getAllByText('Sem dados para o período selecionado').length).toBeGreaterThan(0)
+    })
+  })
+
+  it('renders FAQ panel with count and percentage', async () => {
+    vi.mocked(getAgentStats).mockResolvedValue([])
+    vi.mocked(getVolumeBySegment).mockResolvedValue([])
+    vi.mocked(getRiskBySegment).mockResolvedValue([])
+    vi.mocked(getFaqCount).mockResolvedValue({ faq_count: 1766, total: 8000, percentage: 22.1 })
+
+    render(<StatsBottomBar />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Tickets FAQ')).toBeInTheDocument()
+      expect(screen.getByText(/22,1%/)).toBeInTheDocument()
+    })
+  })
+
+  it('passes date filters to getFaqCount', async () => {
+    vi.mocked(getAgentStats).mockResolvedValue([])
+    vi.mocked(getVolumeBySegment).mockResolvedValue([])
+    vi.mocked(getRiskBySegment).mockResolvedValue([])
+
+    render(<StatsBottomBar createdAfter="2024-01-01" createdBefore="2024-01-31" />)
+
+    await waitFor(() => {
+      expect(vi.mocked(getFaqCount)).toHaveBeenCalledWith({
+        createdAfter: '2024-01-01',
+        createdBefore: '2024-01-31',
+      })
     })
   })
 })
