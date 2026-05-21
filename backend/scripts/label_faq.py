@@ -78,7 +78,8 @@ def run():
             print(f"  Written {total_written}/{len(upserts)} tickets...")
 
     faq_written = sum(1 for u in upserts if u["is_faq"])
-    print(f"\nDone. {faq_written}/{len(upserts)} tickets marked as FAQ ({faq_written / len(upserts) * 100:.1f}%).")
+    pct = faq_written / len(upserts) * 100 if upserts else 0.0
+    print(f"\nDone. {faq_written}/{len(upserts)} tickets marked as FAQ ({pct:.1f}%).")
 
 
 if __name__ == "__main__":
