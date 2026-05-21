@@ -75,3 +75,20 @@ class ReplyOut(BaseModel):
     created_at: str
     is_draft: bool
     source: str
+
+class NewTicketsBreakdown(BaseModel):
+    total: int
+    ENT: int
+    MID: int
+    SMB: int
+
+class TeamStatus(BaseModel):
+    overloaded_agents: list[str]
+    unassigned_urgent: int
+
+class MorningBriefingOut(BaseModel):
+    period_label: str
+    new_tickets: NewTicketsBreakdown
+    team_status: TeamStatus
+    narrative: str
+    next_steps: list[str]
