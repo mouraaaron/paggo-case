@@ -194,6 +194,26 @@ def get_morning_briefing(
     return generate_morning_briefing(created_after, created_before)
 
 
+@router.get("/stats/faq-count")
+def get_faq_count(
+    created_after: str | None = Query(None),
+    created_before: str | None = Query(None),
+):
+    db = get_db()
+    total_q = db.table("tickets").select("ticket_id")
+    faq_q = db.table("tickets").select("ticket_id").eq("is_faq", True)
+    if created_after:
+        total_q = total_q.gte("created_at", created_after)
+        faq_q = faq_q.gte("created_at", created_after)
+    if created_before:
+        total_q = total_q.lte("created_at", f"{created_before}T23:59:59.999999")
+        faq_q = faq_q.lte("created_at", f"{created_before}T23:59:59.999999")
+    total = len(total_q.execute().data)
+    faq_count = len(faq_q.execute().data)
+    percentage = round(faq_count / total * 100, 1) if total > 0 else 0.0
+    return {"faq_count": faq_count, "total": total, "percentage": percentage}
+
+
 @router.get("/{ticket_id}", response_model=TicketOut)
 def get_ticket(ticket_id: str):
     db = get_db()

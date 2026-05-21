@@ -23,6 +23,7 @@ class TicketOut(BaseModel):
     risk_score: int = 0
     close_reason: Optional[str] = None
     merged_into: Optional[str] = None
+    is_faq: bool = False
 
 class StatusUpdate(BaseModel):
     new_status: str
