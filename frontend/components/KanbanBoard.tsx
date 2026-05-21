@@ -259,25 +259,6 @@ export function KanbanBoard() {
         {loading && <span className="text-xs text-brand-muted ml-1">Carregando...</span>}
       </div>
 
-      <div className="flex flex-wrap gap-4 px-5 py-2 border-b border-brand-border text-xs text-brand-muted">
-        <div className="flex items-center gap-1.5">
-          <span className="inline-block w-3 h-4 rounded-sm border-2 border-pink-500 bg-brand-surface" />
-          Sinal de churn detectado
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="inline-block w-3 h-4 rounded-sm border-2 border-dashed border-pink-500 bg-brand-surface" />
-          Sinal de churn + sem responsável
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="inline-block w-3 h-4 rounded-sm border-2 border-red-500 bg-brand-surface" />
-          Risco alto (score ≥ 70)
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="inline-block w-3 h-4 rounded-sm border border-dashed border-brand-muted bg-brand-surface" />
-          Sem responsável
-        </div>
-      </div>
-
       {/* Top row: kanban columns + alerts sidebar — height fixed to viewport */}
       <div className="flex h-[calc(100vh-13rem)] min-h-[480px]">
         <DndContext
