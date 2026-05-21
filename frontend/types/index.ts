@@ -32,6 +32,7 @@ export interface Ticket {
   risk_score: number
   close_reason: string | null
   merged_into: string | null
+  is_faq: boolean
 }
 
 export interface AuditEvent {

@@ -192,3 +192,18 @@ export function getMorningBriefing(createdAfter: string, createdBefore: string):
   const params = new URLSearchParams({ created_after: createdAfter, created_before: createdBefore })
   return req<MorningBriefingData>(`/tickets/stats/morning-briefing?${params}`)
 }
+
+// --- FAQ ---
+export interface FaqCountData {
+  faq_count: number
+  total: number
+  percentage: number
+}
+
+export function getFaqCount(filters?: { createdAfter?: string; createdBefore?: string }): Promise<FaqCountData> {
+  const params = new URLSearchParams()
+  if (filters?.createdAfter) params.set('created_after', filters.createdAfter)
+  if (filters?.createdBefore) params.set('created_before', filters.createdBefore)
+  const qs = params.toString()
+  return req<FaqCountData>(`/tickets/stats/faq-count${qs ? `?${qs}` : ''}`)
+}
