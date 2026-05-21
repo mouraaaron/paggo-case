@@ -178,3 +178,17 @@ export async function sendAgentMessage(
   if (!res.ok) throw new Error(await res.text())
   return res.json()
 }
+
+// --- Morning Briefing ---
+export interface MorningBriefingData {
+  period_label: string
+  new_tickets: { total: number; ENT: number; MID: number; SMB: number }
+  team_status: { overloaded_agents: string[]; unassigned_urgent: number }
+  narrative: string
+  next_steps: string[]
+}
+
+export function getMorningBriefing(createdAfter: string, createdBefore: string): Promise<MorningBriefingData> {
+  const params = new URLSearchParams({ created_after: createdAfter, created_before: createdBefore })
+  return req<MorningBriefingData>(`/tickets/stats/morning-briefing?${params}`)
+}
