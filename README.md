@@ -13,6 +13,7 @@ Aplicação full-stack para triagem de ~8.000 tickets de suporte, construída co
 - **Kanban de tickets** — visão em colunas por status, cards coloridos por prioridade, filtros por data, segmento, agente, canal, flag e categoria
 - **Painel de alertas lateral** — tickets críticos (score ≥ 70) em destaque em tempo real, respeitando os filtros de data ativos
 - **Stats bottom bar** — três painéis: balanceamento de carga por agente, volume de tickets por segmento (ENT/MID/SMB) e score de risco médio por segmento
+- **Morning Briefing** — botão disponível quando o filtro de datas cobre até 3 dias; gera um resumo via GPT-4o-mini com total de novos tickets por segmento, status da equipe e próximos passos em português; o resultado fica em cache e pode ser reaberto sem nova chamada à API
 - **Prioridade automática** — calculada pelo sistema de triagem, nunca pelo cliente: `≥ 70 → URGENT` · `40–69 → HIGH` · `10–39 → MEDIUM` · `< 10 → LOW`
 - **Detalhe do ticket** — painel lateral com audit log, respostas, mudança de status, atribuição, classificação, encerramento e merge
 - **Agente de IA** — assistente conversacional (GPT-4o-mini + tool calling) que lê tickets e executa ações com confirmação humana obrigatória antes de qualquer escrita

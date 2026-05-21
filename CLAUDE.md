@@ -41,7 +41,8 @@ frontend/ (Next.js, Vercel)
     components/                 → KanbanBoard, KanbanColumn, KanbanCard,
                                    TicketDetailPanel, ActionButtons, AuditLog,
                                    AgentChat, TriageBadge,
-                                   AlertPanel (AlertsSidebar + StatsBottomBar)
+                                   AlertPanel (AlertsSidebar + StatsBottomBar),
+                                   MorningBriefingModal
     lib/api.ts                  → all fetch calls, single BASE constant
     types/index.ts              → shared TypeScript types
           ↕ HTTP (NEXT_PUBLIC_BACKEND_URL)
@@ -56,6 +57,7 @@ backend/ (FastAPI, Render)
     services/
         triage_rules.py         → calculate_triage_flags(ticket, has_churn?) → (flags, score, priority)
         churn_classifier.py     → classify_churn_batch(tickets) → {ticket_id: bool} via GPT-4o-mini
+        morning_briefing.py     → generate_morning_briefing(created_after, created_before) → dict
         state_machine.py        → can_transition(current, target) → (bool, msg)
         audit.py                → log_event(...)
         ai_agent.py             → run_agent(history, message, confirmed_tool_call)
@@ -88,7 +90,12 @@ Supabase (PostgreSQL)
 - `GET /tickets/stats/agents` — open ticket count per agent broken down by priority (excludes CLOSED/RESOLVED)
 - `GET /tickets/stats/volume-by-segment` — total/open/closed count per segment (ENT/MID/SMB)
 - `GET /tickets/stats/risk-by-segment` — average risk score per segment
-All three accept `created_after` and `created_before` date filters.
+- `GET /tickets/stats/morning-briefing` — AI-generated briefing for a period of ≤3 days (see Morning Briefing section below)
+All four accept `created_after` and `created_before` date filters.
+
+**Morning Briefing** — endpoint `GET /tickets/stats/morning-briefing?created_after=...&created_before=...` validates that both params are present and that the range is ≤3 days (400 otherwise). The service `services/morning_briefing.py` runs two Supabase queries: (1) tickets created in the period (period-scoped) to count by segment and detect unassigned urgent tickets; (2) all open assigned tickets (not period-scoped) to compute current agent overload. It then calls GPT-4o-mini with `response_format={"type":"json_object"}` to generate `narrative` (1-2 sentences in Portuguese) and `next_steps` (3-5 action items in Portuguese starting with an infinitive verb). On parse failure the service returns `narrative=""` and `next_steps=[]` without crashing.
+
+**Morning Briefing frontend caching** — `StatsBottomBar` caches the last generated `MorningBriefingData` in state. A `useEffect` on `[createdAfter, createdBefore]` clears the cache when the date range changes. First click → calls API, sets data, opens modal, button label becomes "Ver Morning Briefing". Subsequent clicks → opens modal directly without calling the API. This means one API call per date range per session.
 
 **Alert panel layout** — the inbox page uses a layout with kanban on the left, `AlertsSidebar` on the right (fixed 320px), and `StatsBottomBar` below. `AlertsSidebar` shows tickets with `risk_score ≥ 70`. `StatsBottomBar` has three panels: Balanceamento de agentes · Volume por segmento · Score de risco médio por segmento. All panels respect the active date filter via `createdAfter`/`createdBefore` props and a `refreshKey` counter that increments on ticket mutations.
 
