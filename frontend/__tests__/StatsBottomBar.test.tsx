@@ -127,6 +127,7 @@ describe('StatsBottomBar', () => {
     vi.mocked(getAgentStats).mockResolvedValue(mockAgentStats)
     vi.mocked(getVolumeBySegment).mockResolvedValue(mockVolumeStats)
     vi.mocked(getRiskBySegment).mockResolvedValue(mockRiskStats)
+    vi.mocked(getFaqCount).mockResolvedValue({ faq_count: 100, total: 500, percentage: 20 })
 
     const { rerender } = render(<StatsBottomBar refreshKey={0} />)
 
@@ -140,10 +141,11 @@ describe('StatsBottomBar', () => {
       expect(vi.mocked(getAgentStats)).toHaveBeenCalledTimes(2)
       expect(vi.mocked(getVolumeBySegment)).toHaveBeenCalledTimes(2)
       expect(vi.mocked(getRiskBySegment)).toHaveBeenCalledTimes(2)
+      expect(vi.mocked(getFaqCount)).toHaveBeenCalledTimes(2)
     })
   })
 
-  it('passes date filters to all three stat functions', async () => {
+  it('passes date filters to all four stat functions', async () => {
     vi.mocked(getAgentStats).mockResolvedValue([])
     vi.mocked(getVolumeBySegment).mockResolvedValue([])
     vi.mocked(getRiskBySegment).mockResolvedValue([])
@@ -162,6 +164,10 @@ describe('StatsBottomBar', () => {
         createdBefore: '2024-01-31',
       })
       expect(vi.mocked(getRiskBySegment)).toHaveBeenCalledWith({
+        createdAfter: '2024-01-01',
+        createdBefore: '2024-01-31',
+      })
+      expect(vi.mocked(getFaqCount)).toHaveBeenCalledWith({
         createdAfter: '2024-01-01',
         createdBefore: '2024-01-31',
       })
