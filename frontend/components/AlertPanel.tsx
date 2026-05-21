@@ -259,7 +259,16 @@ export function StatsBottomBar({ createdAfter, createdBefore, refreshKey }: Stat
 
   const canBriefing = isValidBriefingRange(createdAfter, createdBefore)
 
+  useEffect(() => {
+    setBriefingData(null)
+    setBriefingError(false)
+  }, [createdAfter, createdBefore])
+
   async function handleBriefingClick() {
+    if (briefingData) {
+      setBriefingOpen(true)
+      return
+    }
     if (!createdAfter || !createdBefore) return
     setBriefingLoading(true)
     setBriefingError(false)
@@ -409,9 +418,11 @@ export function StatsBottomBar({ createdAfter, createdBefore, refreshKey }: Stat
           >
             {briefingLoading
               ? 'Gerando...'
-              : canBriefing
-                ? 'Gerar Morning Briefing'
-                : 'Selecione até 3 dias'}
+              : briefingData
+                ? 'Ver Morning Briefing'
+                : canBriefing
+                  ? 'Gerar Morning Briefing'
+                  : 'Selecione até 3 dias'}
           </button>
         </div>
       </div>
