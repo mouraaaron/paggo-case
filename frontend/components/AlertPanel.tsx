@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Ticket } from '@/types'
-import { getTickets, getVolumeBySegment, getRiskBySegment, getAgentStats } from '@/lib/api'
-import type { SegmentVolumeStat, SegmentRiskStat, AgentStat } from '@/lib/api'
+import { getTickets, getVolumeBySegment, getRiskBySegment, getAgentStats, getMorningBriefing } from '@/lib/api'
+import type { SegmentVolumeStat, SegmentRiskStat, AgentStat, MorningBriefingData } from '@/lib/api'
+import { MorningBriefingModal } from '@/components/MorningBriefingModal'
 
 export function timeAgo(dateStr: string | null): string {
   if (!dateStr) return '—'
@@ -21,6 +22,12 @@ export function flagLabel(flags: string[]): string {
   if (flags.includes('MULTIPLE_OPEN')) return 'MÚLTIPLOS ABERTOS'
   if (flags.includes('STALE_IN_PROGRESS')) return 'PARADO'
   return 'RISCO ALTO'
+}
+
+function isValidBriefingRange(after?: string, before?: string): boolean {
+  if (!after || !before) return false
+  const diffDays = (new Date(before).getTime() - new Date(after).getTime()) / (1000 * 60 * 60 * 24)
+  return diffDays <= 3
 }
 
 // --- AlertsSidebar: right sidebar, alerts list only ---
@@ -245,6 +252,28 @@ export function StatsBottomBar({ createdAfter, createdBefore, refreshKey }: Stat
   const [error, setError] = useState(false)
   const hasData = useRef(false)
 
+  const [briefingData, setBriefingData] = useState<MorningBriefingData | null>(null)
+  const [briefingOpen, setBriefingOpen] = useState(false)
+  const [briefingLoading, setBriefingLoading] = useState(false)
+  const [briefingError, setBriefingError] = useState(false)
+
+  const canBriefing = isValidBriefingRange(createdAfter, createdBefore)
+
+  async function handleBriefingClick() {
+    if (!createdAfter || !createdBefore) return
+    setBriefingLoading(true)
+    setBriefingError(false)
+    try {
+      const data = await getMorningBriefing(createdAfter, createdBefore)
+      setBriefingData(data)
+      setBriefingOpen(true)
+    } catch {
+      setBriefingError(true)
+    } finally {
+      setBriefingLoading(false)
+    }
+  }
+
   useEffect(() => {
     let cancelled = false
     async function load() {
@@ -295,7 +324,12 @@ export function StatsBottomBar({ createdAfter, createdBefore, refreshKey }: Stat
   }
 
   return (
-    <div className="border-t border-brand-border flex">
+    <>
+      <MorningBriefingModal
+        data={briefingOpen ? briefingData : null}
+        onClose={() => setBriefingOpen(false)}
+      />
+      <div className="border-t border-brand-border flex">
       {/* Agentes */}
       <div className="flex-1 border-r border-brand-border p-5">
         <div className="flex items-center gap-2 mb-4">
@@ -359,6 +393,27 @@ export function StatsBottomBar({ createdAfter, createdBefore, refreshKey }: Stat
           )}
         </div>
         <VolumeBySegmentChart stats={volumeStats} />
+
+        <div className="mt-4 border-t border-brand-border/40 pt-4">
+          {briefingError && (
+            <p className="text-[10px] text-brand-error mb-2">Erro ao gerar briefing</p>
+          )}
+          <button
+            onClick={handleBriefingClick}
+            disabled={!canBriefing || briefingLoading}
+            className={`w-full text-[11px] font-semibold py-2 px-3 rounded-md border transition-colors ${
+              canBriefing && !briefingLoading
+                ? 'border-brand-green text-brand-green hover:bg-brand-green/10 cursor-pointer'
+                : 'border-brand-border text-brand-border cursor-not-allowed'
+            }`}
+          >
+            {briefingLoading
+              ? 'Gerando...'
+              : canBriefing
+                ? 'Gerar Morning Briefing'
+                : 'Selecione até 3 dias'}
+          </button>
+        </div>
       </div>
 
       {/* Score de Risco por Segmento */}
@@ -369,5 +424,6 @@ export function StatsBottomBar({ createdAfter, createdBefore, refreshKey }: Stat
         <RiskBySegmentChart stats={riskStats} />
       </div>
     </div>
+    </>
   )
 }
