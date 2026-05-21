@@ -125,3 +125,40 @@ def test_briefing_segment_counts_only_ent_mid_smb(monkeypatch):
     assert data["new_tickets"]["MID"] == 0
     assert data["new_tickets"]["SMB"] == 0
     assert data["new_tickets"]["total"] == 3
+
+
+def test_briefing_urgent_closed_not_counted_as_unassigned(monkeypatch):
+    period_rows = [
+        # URGENT + unassigned + open status → should be counted
+        {"customer_segment": "ENT", "status": "NEW", "priority": "URGENT", "assigned_to": None},
+        # URGENT + unassigned + CLOSED status → should NOT be counted
+        {"customer_segment": "ENT", "status": "CLOSED", "priority": "URGENT", "assigned_to": None},
+    ]
+    db = _sequential([period_rows, []])
+    monkeypatch.setattr(services.morning_briefing, "get_db", lambda: db)
+    monkeypatch.setattr(services.morning_briefing, "_get_client", lambda: _mk_openai_mock())
+
+    resp = client.get(
+        "/tickets/stats/morning-briefing?created_after=2026-05-19&created_before=2026-05-21"
+    )
+    data = resp.json()
+    assert data["team_status"]["unassigned_urgent"] == 1  # only the NEW one
+
+
+def test_briefing_llm_parse_failure_returns_empty_narrative(monkeypatch):
+    period_rows = [{"customer_segment": "ENT", "status": "NEW", "priority": "LOW", "assigned_to": None}]
+    db = _sequential([period_rows, []])
+    monkeypatch.setattr(services.morning_briefing, "get_db", lambda: db)
+
+    # Mock returning invalid JSON from the LLM
+    bad_mock = MagicMock()
+    bad_mock.chat.completions.create.return_value.choices[0].message.content = "not valid json {{{"
+    monkeypatch.setattr(services.morning_briefing, "_get_client", lambda: bad_mock)
+
+    resp = client.get(
+        "/tickets/stats/morning-briefing?created_after=2026-05-19&created_before=2026-05-21"
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["narrative"] == ""
+    assert data["next_steps"] == []

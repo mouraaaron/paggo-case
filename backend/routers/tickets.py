@@ -3,6 +3,7 @@ from models import TicketOut, StatusUpdate, ClassifyUpdate, AssignUpdate, ReplyC
 from database import get_db
 from services.state_machine import can_transition
 from services.audit import log_event
+from services.morning_briefing import generate_morning_briefing
 from datetime import datetime
 from collections import defaultdict
 
@@ -181,14 +182,11 @@ def get_morning_briefing(
     created_after: str | None = Query(None),
     created_before: str | None = Query(None),
 ):
-    from datetime import datetime as _dt
-    from services.morning_briefing import generate_morning_briefing
-
     if not created_after or not created_before:
-        raise HTTPException(status_code=400, detail="created_after and created_before são obrigatórios")
+        raise HTTPException(status_code=400, detail="created_after e created_before são obrigatórios")
     try:
-        d_from = _dt.fromisoformat(created_after)
-        d_to = _dt.fromisoformat(created_before)
+        d_from = datetime.fromisoformat(created_after)
+        d_to = datetime.fromisoformat(created_before)
     except ValueError:
         raise HTTPException(status_code=400, detail="Formato de data inválido (use YYYY-MM-DD)")
     if (d_to - d_from).days > 3:
