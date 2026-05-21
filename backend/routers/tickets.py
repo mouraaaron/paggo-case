@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Query, HTTPException
-from models import TicketOut, StatusUpdate, ClassifyUpdate, AssignUpdate, ReplyCreate, CloseTicket, MergeTickets, ReplyOut
+from models import TicketOut, StatusUpdate, ClassifyUpdate, AssignUpdate, ReplyCreate, CloseTicket, MergeTickets, ReplyOut, MorningBriefingOut
 from database import get_db
 from services.state_machine import can_transition
 from services.audit import log_event
@@ -174,6 +174,26 @@ def get_agent_stats(
         {"agent": a, **d}
         for a, d in sorted(agent_data.items(), key=lambda x: -x[1]["total"])
     ]
+
+
+@router.get("/stats/morning-briefing", response_model=MorningBriefingOut)
+def get_morning_briefing(
+    created_after: str | None = Query(None),
+    created_before: str | None = Query(None),
+):
+    from datetime import datetime as _dt
+    from services.morning_briefing import generate_morning_briefing
+
+    if not created_after or not created_before:
+        raise HTTPException(status_code=400, detail="created_after and created_before são obrigatórios")
+    try:
+        d_from = _dt.fromisoformat(created_after)
+        d_to = _dt.fromisoformat(created_before)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de data inválido (use YYYY-MM-DD)")
+    if (d_to - d_from).days > 3:
+        raise HTTPException(status_code=400, detail="Intervalo máximo de 3 dias")
+    return generate_morning_briefing(created_after, created_before)
 
 
 @router.get("/{ticket_id}", response_model=TicketOut)
