@@ -67,7 +67,7 @@ export function KanbanCard({ ticket, onClick }: KanbanCardProps) {
       {...attributes}
       {...listeners}
       onClick={() => onClick(ticket)}
-      className={`bg-brand-surface rounded-lg p-3 cursor-grab active:cursor-grabbing select-none hover:bg-brand-mid transition-colors ${cardBorderClass(ticket)}`}
+      className={`${ticket.is_faq ? 'bg-white hover:bg-gray-50' : 'bg-brand-surface hover:bg-brand-mid'} rounded-lg p-3 cursor-grab active:cursor-grabbing select-none transition-colors ${cardBorderClass(ticket)}`}
     >
       {/* Row 1: id, segment, priority, urgent icon, escalated badge */}
       <div className="flex items-center gap-1 flex-wrap mb-1.5">
@@ -99,7 +99,7 @@ export function KanbanCard({ ticket, onClick }: KanbanCardProps) {
       </div>
 
       {/* Row 2: subject */}
-      <p className="text-xs font-medium text-white line-clamp-2 mb-1 leading-snug">{ticket.subject}</p>
+      <p className={`text-xs font-medium ${ticket.is_faq ? 'text-gray-900' : 'text-white'} line-clamp-2 mb-1 leading-snug`}>{ticket.subject}</p>
 
       {/* Row 3: customer + category */}
       <p className="text-[10px] text-brand-muted mb-2 truncate">
