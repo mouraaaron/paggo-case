@@ -5,6 +5,8 @@ import { Calendar, ChevronLeft, ChevronRight, X } from 'lucide-react'
 
 interface DateRangePickerProps {
   onRangeChange: (from: string | undefined, to: string | undefined) => void
+  initialFrom?: string
+  initialTo?: string
 }
 
 const MONTHS = [
@@ -33,12 +35,23 @@ function monthCells(year: number, month: number): (Date | null)[] {
 const MIN = norm(new Date(2026, 0, 1))   // 1 jan 2026
 const MAX = norm(new Date(2026, 2, 31))  // 31 mar 2026
 
-export function DateRangePicker({ onRangeChange }: DateRangePickerProps) {
+function parseYMD(s: string): Date {
+  const [y, m, d] = s.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
+export function DateRangePicker({ onRangeChange, initialFrom, initialTo }: DateRangePickerProps) {
   const today = norm(new Date())
   const [open, setOpen] = useState(false)
-  const [view, setView] = useState({ year: 2026, month: 0 })
-  const [start, setStart] = useState<Date | null>(null)
-  const [end, setEnd] = useState<Date | null>(null)
+  const initStart = initialFrom ? norm(parseYMD(initialFrom)) : null
+  const initEnd = initialTo ? norm(parseYMD(initialTo)) : null
+  const [view, setView] = useState(
+    initStart
+      ? { year: initStart.getFullYear(), month: initStart.getMonth() }
+      : { year: 2026, month: 0 }
+  )
+  const [start, setStart] = useState<Date | null>(initStart)
+  const [end, setEnd] = useState<Date | null>(initEnd)
   const [hover, setHover] = useState<Date | null>(null)
   const ref = useRef<HTMLDivElement>(null)
 

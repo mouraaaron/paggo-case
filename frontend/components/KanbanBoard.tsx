@@ -43,7 +43,10 @@ export function KanbanBoard() {
     Object.fromEntries(COLUMNS.map(c => [c.status, []]))
   )
   const [loading, setLoading] = useState(true)
-  const [filters, setFilters] = useState<GlobalFilters>({})
+  const [filters, setFilters] = useState<GlobalFilters>({
+    created_after: '2026-03-29',
+    created_before: '2026-03-31',
+  })
   const [visibleStatuses, setVisibleStatuses] = useState<Set<string>>(
     new Set(COLUMNS.map(c => c.status))
   )
@@ -235,6 +238,8 @@ export function KanbanBoard() {
         </select>
 
         <DateRangePicker
+          initialFrom={filters.created_after}
+          initialTo={filters.created_before}
           onRangeChange={(from, to) => {
             setFilters(f => ({ ...f, created_after: from, created_before: to }))
           }}
