@@ -109,7 +109,19 @@ All four accept `created_after` and `created_before` date filters.
 
 **Agent write-tool confirmation flow** — when the agent wants to call a write tool (`update_ticket_status`, `assign_ticket`, `classify_ticket`), it returns `pending_action` instead of executing. The frontend shows a confirmation banner; on confirm, the frontend sends `confirmed_action` back and the backend executes it. The `message` field is an empty string on confirm turns — the backend ignores it when `confirmed_action` is set.
 
-**Invalid status transitions return HTTP 422**, not 400. The state machine (`services/state_machine.py`) defines the allowed transitions.
+**Invalid status transitions return HTTP 422**, not 400. The state machine (`services/state_machine.py`) and its frontend mirror (`frontend/lib/stateMachine.ts`) define the allowed transitions. Both files must be kept in sync.
+
+**State machine transitions:**
+| From | To (allowed targets) |
+|------|----------------------|
+| `NEW` | `TRIAGED` |
+| `TRIAGED` | `IN_PROGRESS` |
+| `IN_PROGRESS` | `WAITING_CUSTOMER`, `ESCALATED`, `RESOLVED` |
+| `WAITING_CUSTOMER` | `IN_PROGRESS` |
+| `ESCALATED` | `IN_PROGRESS`, `RESOLVED` |
+| `RESOLVED` | `CLOSED`, `REOPENED`, `IN_PROGRESS` |
+| `CLOSED` | `REOPENED` (not `IN_PROGRESS` — must go through REOPENED for audit trail) |
+| `REOPENED` | `IN_PROGRESS`, `TRIAGED` |
 
 **tsconfig.json excludes test files from Next.js type check.** `vitest.config.mts`, `vitest.setup.ts`, `__tests__/`, `e2e/`, and `playwright.config.ts` are in the `exclude` list. Without this, Next.js's type checker picks up `vitest.config.mts` via the `**/*.mts` include pattern and fails due to a Vite version conflict between Next.js and vitest's bundled Vite.
 
