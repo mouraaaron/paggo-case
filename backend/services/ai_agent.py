@@ -124,17 +124,18 @@ def _execute_tool(name: str, args: dict) -> str:
                 query = query.eq("customer_segment", args["customer_segment"])
             if args.get("assigned_to"):
                 if args["assigned_to"] == "unassigned":
-                    query = query.is_("assigned_to", "null")
+                    query = query.is_("assigned_to", None)
                 else:
                     query = query.eq("assigned_to", args["assigned_to"])
             if args.get("category"):
                 query = query.eq("category", args["category"])
             if args.get("no_reply"):
-                query = query.is_("last_reply_at", "null")
+                query = query.is_("last_reply_at", None)
             if args.get("created_after"):
                 query = query.gte("created_at", args["created_after"])
             if args.get("created_before"):
-                query = query.lte("created_at", f"{args['created_before']}T23:59:59.999999")
+                date_part = args["created_before"].split("T")[0] if "T" in args["created_before"] else args["created_before"]
+                query = query.lte("created_at", f"{date_part}T23:59:59.999999")
             sort_field = args.get("sort_by", "risk_score")
             sort_desc = args.get("sort_desc", True)
             limit = min(int(args.get("limit", 10)), 50)

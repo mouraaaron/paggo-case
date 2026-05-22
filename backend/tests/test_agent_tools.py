@@ -43,7 +43,7 @@ def test_list_tickets_passes_all_filters(monkeypatch):
     q.eq.assert_any_call("customer_segment", "ENT")
     q.eq.assert_any_call("assigned_to", "alice")
     q.eq.assert_any_call("category", "CHURN_SIGNAL")
-    q.is_.assert_called_with("last_reply_at", "null")
+    q.is_.assert_called_with("last_reply_at", None)
 
 
 def test_list_tickets_no_reply_false_skips_filter(monkeypatch):
@@ -52,3 +52,11 @@ def test_list_tickets_no_reply_false_skips_filter(monkeypatch):
 
     agent_module._execute_tool("list_tickets", {"no_reply": False})
     q.is_.assert_not_called()
+
+
+def test_list_tickets_unassigned_uses_is_filter(monkeypatch):
+    db, q = _make_db([])
+    monkeypatch.setattr(agent_module, "get_db", lambda: db)
+
+    agent_module._execute_tool("list_tickets", {"assigned_to": "unassigned"})
+    q.is_.assert_called_with("assigned_to", None)
