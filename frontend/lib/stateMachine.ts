@@ -4,9 +4,10 @@ export const VALID_TRANSITIONS: Record<string, string[]> = {
   IN_PROGRESS: ['WAITING_CUSTOMER', 'ESCALATED', 'RESOLVED'],
   WAITING_CUSTOMER: ['IN_PROGRESS'],
   ESCALATED: ['IN_PROGRESS', 'RESOLVED'],
-  RESOLVED: ['CLOSED', 'IN_PROGRESS', 'REOPENED'],
-  CLOSED: ['IN_PROGRESS', 'REOPENED'],
-  REOPENED: ['IN_PROGRESS', 'CLOSED'],
+  // RESOLVED → IN_PROGRESS kept as quick un-resolve path; use REOPENED for audit trail
+  RESOLVED: ['CLOSED', 'REOPENED', 'IN_PROGRESS'],
+  CLOSED: ['REOPENED'],
+  REOPENED: ['IN_PROGRESS', 'TRIAGED'],
 }
 
 export function canTransition(current: string, target: string): boolean {
