@@ -331,9 +331,6 @@ def _execute_tool(name: str, args: dict) -> str:
             if primary.data[0]["customer_id"] != secondary.data[0]["customer_id"]:
                 return json.dumps({"error": "Cannot merge tickets from different customers"})
             secondary_status = secondary.data[0]["status"]
-            ok, msg = can_transition(secondary_status, "CLOSED")
-            if not ok:
-                return json.dumps({"error": f"Cannot close secondary ticket: {msg}"})
             db.table("ticket_replies").update({"ticket_id": args["primary_ticket_id"]}).eq("ticket_id", args["secondary_ticket_id"]).execute()
             db.table("tickets").update({
                 "status": "CLOSED",

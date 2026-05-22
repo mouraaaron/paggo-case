@@ -171,6 +171,37 @@ def test_merge_tickets_executes_and_logs(monkeypatch):
     assert data.get("success") is True
 
 
+def test_merge_tickets_allows_non_resolved_secondary(monkeypatch):
+    """merge_tickets bypasses state machine — any secondary status is valid."""
+    primary = {"ticket_id": "T1", "customer_id": "C1", "status": "IN_PROGRESS"}
+    secondary = {"ticket_id": "T2", "customer_id": "C1", "status": "NEW"}
+
+    call_count = [0]
+    def fake_execute():
+        r = MagicMock()
+        if call_count[0] == 0: r.data = [primary]
+        elif call_count[0] == 1: r.data = [secondary]
+        else: r.data = [primary]
+        call_count[0] += 1
+        return r
+
+    q = MagicMock()
+    for m in ("select", "eq", "neq", "gte", "lte", "order", "limit", "range",
+              "update", "insert", "single", "contains", "is_"):
+        getattr(q, m).return_value = q
+    q.execute.side_effect = fake_execute
+    db = MagicMock()
+    db.table.return_value = q
+    monkeypatch.setattr(agent_module, "get_db", lambda: db)
+
+    result = agent_module._execute_tool("merge_tickets", {
+        "primary_ticket_id": "T1",
+        "secondary_ticket_id": "T2",
+    })
+    data = json.loads(result)
+    assert data.get("success") is True
+
+
 def test_merge_tickets_rejects_different_customers(monkeypatch):
     primary = {"ticket_id": "T1", "customer_id": "C1", "status": "RESOLVED"}
     secondary = {"ticket_id": "T2", "customer_id": "C2", "status": "RESOLVED"}
