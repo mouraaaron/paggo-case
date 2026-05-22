@@ -81,6 +81,7 @@ export function ActionButtons({ ticket, onUpdate }: ActionButtonsProps) {
   const [replyAuthor, setReplyAuthor] = useState('support-agent')
   const [replyError, setReplyError] = useState('')
   const [replyLoading, setReplyLoading] = useState(false)
+  const [replySent, setReplySent] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
 
   // Section E — Close Ticket
@@ -129,6 +130,7 @@ export function ActionButtons({ ticket, onUpdate }: ActionButtonsProps) {
 
   async function handleReply() {
     setReplyError('')
+    setReplySent(false)
     setReplyLoading(true)
     try {
       await addReply(ticket.ticket_id, replyBody)
@@ -136,6 +138,8 @@ export function ActionButtons({ ticket, onUpdate }: ActionButtonsProps) {
       onUpdate(freshTicket)
       setReplyBody('')
       setReplyAuthor('support-agent')
+      setReplySent(true)
+      setTimeout(() => setReplySent(false), 3000)
     } catch (e) {
       setReplyError(e instanceof Error ? e.message : 'Error sending reply')
     } finally {
@@ -309,6 +313,7 @@ export function ActionButtons({ ticket, onUpdate }: ActionButtonsProps) {
           </button>
         </div>
         {replyError && <p className="text-[10px] text-brand-error mt-1">{replyError}</p>}
+        {replySent && <p className="text-[10px] text-brand-green mt-1">Resposta enviada com sucesso.</p>}
       </section>
 
       {/* Section E — Close Ticket */}
