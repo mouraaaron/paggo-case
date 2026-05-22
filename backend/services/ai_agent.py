@@ -139,6 +139,11 @@ TOOLS = [
 WRITE_TOOLS = {"update_ticket_status", "assign_ticket", "classify_ticket",
                "close_ticket", "merge_tickets", "draft_reply"}
 
+VALID_CLOSE_REASONS = {
+    "RESOLVED_FIXED", "RESOLVED_INFO", "DUPLICATE",
+    "NOT_REPRODUCIBLE", "WONT_FIX", "CUSTOMER_NO_RESPONSE"
+}
+
 
 def _execute_tool(name: str, args: dict) -> str:
     try:
@@ -221,12 +226,8 @@ def _execute_tool(name: str, args: dict) -> str:
                 }).execute()
             return json.dumps({"success": True, **update})
         elif name == "close_ticket":
-            VALID_REASONS = {
-                "RESOLVED_FIXED", "RESOLVED_INFO", "DUPLICATE",
-                "NOT_REPRODUCIBLE", "WONT_FIX", "CUSTOMER_NO_RESPONSE"
-            }
-            if args["close_reason"] not in VALID_REASONS:
-                return json.dumps({"error": f"Invalid close_reason '{args['close_reason']}'. Must be one of {sorted(VALID_REASONS)}"})
+            if args["close_reason"] not in VALID_CLOSE_REASONS:
+                return json.dumps({"error": f"Invalid close_reason '{args['close_reason']}'. Must be one of {sorted(VALID_CLOSE_REASONS)}"})
             ticket = db.table("tickets").select("status").eq("ticket_id", args["ticket_id"]).single().execute()
             current = ticket.data["status"]
             ok, msg = can_transition(current, "CLOSED")
@@ -248,12 +249,16 @@ def _execute_tool(name: str, args: dict) -> str:
             return json.dumps({"success": True, "close_reason": args["close_reason"]})
 
         elif name == "merge_tickets":
-            primary = db.table("tickets").select("ticket_id,customer_id").eq("ticket_id", args["primary_ticket_id"]).execute()
-            secondary = db.table("tickets").select("ticket_id,customer_id").eq("ticket_id", args["secondary_ticket_id"]).execute()
+            primary = db.table("tickets").select("ticket_id,customer_id,status").eq("ticket_id", args["primary_ticket_id"]).execute()
+            secondary = db.table("tickets").select("ticket_id,customer_id,status").eq("ticket_id", args["secondary_ticket_id"]).execute()
             if not primary.data or not secondary.data:
                 return json.dumps({"error": "One or both tickets not found"})
             if primary.data[0]["customer_id"] != secondary.data[0]["customer_id"]:
                 return json.dumps({"error": "Cannot merge tickets from different customers"})
+            secondary_status = secondary.data[0]["status"]
+            ok, msg = can_transition(secondary_status, "CLOSED")
+            if not ok:
+                return json.dumps({"error": f"Cannot close secondary ticket: {msg}"})
             db.table("ticket_replies").update({"ticket_id": args["primary_ticket_id"]}).eq("ticket_id", args["secondary_ticket_id"]).execute()
             db.table("tickets").update({
                 "status": "CLOSED",
@@ -272,6 +277,7 @@ def _execute_tool(name: str, args: dict) -> str:
                 "action": "MERGED_INTO",
                 "actor": "AI Agent",
                 "source": "AGENT",
+                "old_value": secondary_status,
                 "new_value": args["primary_ticket_id"],
             }).execute()
             return json.dumps({"success": True, "primary": args["primary_ticket_id"], "merged": args["secondary_ticket_id"]})

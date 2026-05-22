@@ -1,6 +1,7 @@
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+import json
 from unittest.mock import MagicMock, patch
 import services.ai_agent as agent_module
 
@@ -36,7 +37,6 @@ def test_list_tickets_passes_all_filters(monkeypatch):
         "sort_desc": False,
         "limit": 5,
     })
-    import json
     data = json.loads(result)
     assert isinstance(data, list)
     q.eq.assert_any_call("status", "NEW")
@@ -87,7 +87,6 @@ def test_close_ticket_executes_and_logs(monkeypatch):
         "ticket_id": "T1",
         "close_reason": "RESOLVED_FIXED",
     })
-    import json
     data = json.loads(result)
     assert data.get("success") is True
     q.insert.assert_called()
@@ -111,7 +110,6 @@ def test_close_ticket_rejects_invalid_transition(monkeypatch):
         "ticket_id": "T1",
         "close_reason": "RESOLVED_FIXED",
     })
-    import json
     data = json.loads(result)
     assert "error" in data
 
@@ -134,7 +132,6 @@ def test_close_ticket_rejects_invalid_reason(monkeypatch):
         "ticket_id": "T1",
         "close_reason": "INVALID_REASON",
     })
-    import json
     data = json.loads(result)
     assert "error" in data
 
@@ -142,8 +139,8 @@ def test_close_ticket_rejects_invalid_reason(monkeypatch):
 # ── merge_tickets ─────────────────────────────────────────────────────────────
 
 def test_merge_tickets_executes_and_logs(monkeypatch):
-    primary = {"ticket_id": "T1", "customer_id": "C1"}
-    secondary = {"ticket_id": "T2", "customer_id": "C1"}
+    primary = {"ticket_id": "T1", "customer_id": "C1", "status": "RESOLVED"}
+    secondary = {"ticket_id": "T2", "customer_id": "C1", "status": "RESOLVED"}
 
     call_count = [0]
     def fake_execute():
@@ -170,14 +167,13 @@ def test_merge_tickets_executes_and_logs(monkeypatch):
         "primary_ticket_id": "T1",
         "secondary_ticket_id": "T2",
     })
-    import json
     data = json.loads(result)
     assert data.get("success") is True
 
 
 def test_merge_tickets_rejects_different_customers(monkeypatch):
-    primary = {"ticket_id": "T1", "customer_id": "C1"}
-    secondary = {"ticket_id": "T2", "customer_id": "C2"}
+    primary = {"ticket_id": "T1", "customer_id": "C1", "status": "RESOLVED"}
+    secondary = {"ticket_id": "T2", "customer_id": "C2", "status": "RESOLVED"}
 
     call_count = [0]
     def fake_execute():
@@ -199,6 +195,5 @@ def test_merge_tickets_rejects_different_customers(monkeypatch):
         "primary_ticket_id": "T1",
         "secondary_ticket_id": "T2",
     })
-    import json
     data = json.loads(result)
     assert "error" in data
