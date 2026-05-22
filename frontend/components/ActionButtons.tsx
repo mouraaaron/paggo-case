@@ -151,16 +151,11 @@ export function ActionButtons({ ticket, onUpdate }: ActionButtonsProps) {
     setAiLoading(true)
     setReplyError('')
     try {
-      const prompt =
-        `Gere uma sugestão de resposta em português para o seguinte ticket de suporte. ` +
-        `Seja profissional, empático e objetivo:\n\n` +
-        `Assunto: ${ticket.subject}\n` +
-        `Conteúdo: ${ticket.body_preview || '(sem preview)'}\n` +
-        `Status: ${ticket.status}\n` +
-        `Segmento: ${ticket.customer_segment || 'N/D'}\n` +
-        `Prioridade: ${ticket.priority || 'N/D'}`
+      const prompt = `Redija uma resposta para o ticket ${ticket.ticket_id}.`
       const { reply } = await sendAgentMessage(prompt, [])
-      setReplyBody(reply)
+      // draft_reply wraps text between --- markers; extract just the draft body
+      const match = reply.match(/---\n([\s\S]+?)\n---/)
+      setReplyBody(match ? match[1].trim() : reply)
     } catch (e) {
       setReplyError(e instanceof Error ? e.message : 'Erro ao gerar resposta')
     } finally {
