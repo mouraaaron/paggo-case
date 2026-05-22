@@ -30,14 +30,25 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "list_tickets",
-            "description": "List tickets with optional filters",
+            "description": (
+                "List tickets with optional filters. Use no_reply=true to find tickets "
+                "with no agent response yet. Use sort_by='created_at' + sort_desc=false "
+                "to get oldest first."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "status": {"type": "string"},
-                    "priority": {"type": "string"},
-                    "customer_segment": {"type": "string"},
-                    "limit": {"type": "integer", "default": 10}
+                    "status":           {"type": "string", "description": "e.g. NEW, IN_PROGRESS, ESCALATED"},
+                    "priority":         {"type": "string", "description": "LOW, MEDIUM, HIGH, URGENT"},
+                    "customer_segment": {"type": "string", "description": "SMB, MID, ENT"},
+                    "assigned_to":      {"type": "string", "description": "agent name, or 'unassigned' to filter unassigned"},
+                    "category":         {"type": "string", "description": "BILLING, BUG, FEATURE_REQUEST, HOW_TO, CHURN_SIGNAL, OTHER"},
+                    "no_reply":         {"type": "boolean", "description": "If true, return only tickets with no reply yet (last_reply_at IS NULL)"},
+                    "created_after":    {"type": "string", "description": "ISO date string, e.g. 2026-01-15"},
+                    "created_before":   {"type": "string", "description": "ISO date string, e.g. 2026-03-31"},
+                    "sort_by":          {"type": "string", "description": "Field to sort by: risk_score (default), created_at, last_reply_at"},
+                    "sort_desc":        {"type": "boolean", "description": "Sort descending (default true). Pass false for oldest-first."},
+                    "limit":            {"type": "integer", "description": "Max results, default 10, max 50"}
                 }
             }
         }
@@ -101,14 +112,33 @@ def _execute_tool(name: str, args: dict) -> str:
             result = db.table("tickets").select("*").eq("ticket_id", args["ticket_id"]).single().execute()
             return json.dumps(result.data)
         elif name == "list_tickets":
-            query = db.table("tickets").select("ticket_id,subject,status,priority,customer_name,customer_segment,risk_score")
+            query = db.table("tickets").select(
+                "ticket_id,subject,status,priority,customer_name,customer_segment,"
+                "assigned_to,category,risk_score,created_at,last_reply_at,triage_flags"
+            )
             if args.get("status"):
                 query = query.eq("status", args["status"])
             if args.get("priority"):
                 query = query.eq("priority", args["priority"])
             if args.get("customer_segment"):
                 query = query.eq("customer_segment", args["customer_segment"])
-            query = query.limit(args.get("limit", 10))
+            if args.get("assigned_to"):
+                if args["assigned_to"] == "unassigned":
+                    query = query.is_("assigned_to", "null")
+                else:
+                    query = query.eq("assigned_to", args["assigned_to"])
+            if args.get("category"):
+                query = query.eq("category", args["category"])
+            if args.get("no_reply"):
+                query = query.is_("last_reply_at", "null")
+            if args.get("created_after"):
+                query = query.gte("created_at", args["created_after"])
+            if args.get("created_before"):
+                query = query.lte("created_at", f"{args['created_before']}T23:59:59.999999")
+            sort_field = args.get("sort_by", "risk_score")
+            sort_desc = args.get("sort_desc", True)
+            limit = min(int(args.get("limit", 10)), 50)
+            query = query.order(sort_field, desc=sort_desc).limit(limit)
             result = query.execute()
             return json.dumps(result.data)
         elif name == "update_ticket_status":
