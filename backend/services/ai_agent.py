@@ -464,53 +464,74 @@ def run_agent(
                 "updated_history": conversation_history
             }
 
-        if name in WRITE_TOOLS:
-            if name == "draft_reply":
-                # Generate draft first, then show for review
-                gen_result = _execute_tool("draft_reply", args)
-                try:
-                    gen_data = json.loads(gen_result)
-                except json.JSONDecodeError:
-                    gen_data = {}
-                if gen_data.get("error"):
+        # Tool call loop — execute read tools repeatedly until model produces text
+        # (model may chain multiple list_tickets / get_ticket calls before answering)
+        for _ in range(10):
+            if name in WRITE_TOOLS:
+                if name == "draft_reply":
+                    gen_result = _execute_tool("draft_reply", args)
+                    try:
+                        gen_data = json.loads(gen_result)
+                    except json.JSONDecodeError:
+                        gen_data = {}
+                    if gen_data.get("error"):
+                        return {
+                            "reply": f"Não consegui gerar o rascunho: {gen_data['error']}",
+                            "pending_action": None,
+                            "updated_history": messages[1:],
+                        }
+                    draft_body = gen_data.get("draft_body", "")
+                    if not draft_body:
+                        return {
+                            "reply": "Não consegui gerar um rascunho para este ticket. Verifique se o ticket_id está correto.",
+                            "pending_action": None,
+                            "updated_history": messages[1:],
+                        }
+                    args["draft_body"] = draft_body
                     return {
-                        "reply": f"Não consegui gerar o rascunho: {gen_data['error']}",
-                        "pending_action": None,
+                        "reply": (
+                            f"Rascunho gerado para **{args['ticket_id']}**:\n\n"
+                            f"---\n{draft_body}\n---\n\n"
+                            f"Enviar esta resposta?"
+                        ),
+                        "pending_action": {"name": "draft_reply", "args": args, "tool_call_id": tool_call.id},
                         "updated_history": messages[1:],
                     }
-                draft_body = gen_data.get("draft_body", "")
-                if not draft_body:
-                    return {
-                        "reply": "Não consegui gerar um rascunho para este ticket. Verifique se o ticket_id está correto.",
-                        "pending_action": None,
-                        "updated_history": messages[1:],
-                    }
-                args["draft_body"] = draft_body
                 return {
-                    "reply": (
-                        f"Rascunho gerado para **{args['ticket_id']}**:\n\n"
-                        f"---\n{draft_body}\n---\n\n"
-                        f"Enviar esta resposta?"
-                    ),
-                    "pending_action": {"name": "draft_reply", "args": args, "tool_call_id": tool_call.id},
-                    "updated_history": messages[1:],
+                    "reply": f"I'd like to call **{name}** with: {json.dumps(args, indent=2)}. Shall I proceed?",
+                    "pending_action": {"name": name, "args": args, "tool_call_id": tool_call.id},
+                    "updated_history": messages[1:]
                 }
-            return {
-                "reply": f"I'd like to call **{name}** with: {json.dumps(args, indent=2)}. Shall I proceed?",
-                "pending_action": {"name": name, "args": args, "tool_call_id": tool_call.id},
-                "updated_history": messages[1:]
-            }
 
-        result = _execute_tool(name, args)
-        messages.append({"role": "assistant", "tool_calls": [{"id": tool_call.id, "type": "function", "function": {"name": name, "arguments": tool_call.function.arguments}}]})
-        messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": result})
+            result = _execute_tool(name, args)
+            messages.append({"role": "assistant", "tool_calls": [{"id": tool_call.id, "type": "function", "function": {"name": name, "arguments": tool_call.function.arguments}}]})
+            messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": result})
 
-        followup = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=messages,
-            tools=TOOLS
-        )
-        reply = followup.choices[0].message.content or ""
+            next_response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=messages,
+                tools=TOOLS
+            )
+            next_msg = next_response.choices[0].message
+
+            if not next_msg.tool_calls:
+                reply = next_msg.content or ""
+                messages.append({"role": "assistant", "content": reply})
+                return {"reply": reply, "pending_action": None, "updated_history": messages[1:]}
+
+            # Model wants to call another tool — continue loop
+            tool_call = next_msg.tool_calls[0]
+            name = tool_call.function.name
+            try:
+                args = json.loads(tool_call.function.arguments)
+            except json.JSONDecodeError:
+                return {
+                    "reply": "Erro ao processar chamada de tool. Tente novamente.",
+                    "pending_action": None,
+                    "updated_history": messages[1:]
+                }
+
+        reply = "Atingi o limite de operações por turno. Tente uma pergunta mais específica."
         messages.append({"role": "assistant", "content": reply})
         return {"reply": reply, "pending_action": None, "updated_history": messages[1:]}
 
