@@ -60,3 +60,145 @@ def test_list_tickets_unassigned_uses_is_filter(monkeypatch):
 
     agent_module._execute_tool("list_tickets", {"assigned_to": "unassigned"})
     q.is_.assert_called_with("assigned_to", None)
+
+
+# ── close_ticket ──────────────────────────────────────────────────────────────
+
+def test_close_ticket_executes_and_logs(monkeypatch):
+    ticket_data = {"status": "RESOLVED"}
+
+    call_count = [0]
+    def fake_execute():
+        r = MagicMock()
+        r.data = ticket_data
+        call_count[0] += 1
+        return r
+
+    q = MagicMock()
+    for m in ("select", "eq", "neq", "gte", "lte", "order", "limit", "range",
+              "update", "insert", "single", "contains", "is_"):
+        getattr(q, m).return_value = q
+    q.execute.side_effect = fake_execute
+    db = MagicMock()
+    db.table.return_value = q
+    monkeypatch.setattr(agent_module, "get_db", lambda: db)
+
+    result = agent_module._execute_tool("close_ticket", {
+        "ticket_id": "T1",
+        "close_reason": "RESOLVED_FIXED",
+    })
+    import json
+    data = json.loads(result)
+    assert data.get("success") is True
+    q.insert.assert_called()
+
+
+def test_close_ticket_rejects_invalid_transition(monkeypatch):
+    ticket_data = {"status": "NEW"}
+
+    q = MagicMock()
+    for m in ("select", "eq", "neq", "gte", "lte", "order", "limit", "range",
+              "update", "insert", "single", "contains", "is_"):
+        getattr(q, m).return_value = q
+    r = MagicMock()
+    r.data = ticket_data
+    q.execute.return_value = r
+    db = MagicMock()
+    db.table.return_value = q
+    monkeypatch.setattr(agent_module, "get_db", lambda: db)
+
+    result = agent_module._execute_tool("close_ticket", {
+        "ticket_id": "T1",
+        "close_reason": "RESOLVED_FIXED",
+    })
+    import json
+    data = json.loads(result)
+    assert "error" in data
+
+
+def test_close_ticket_rejects_invalid_reason(monkeypatch):
+    ticket_data = {"status": "RESOLVED"}
+
+    q = MagicMock()
+    for m in ("select", "eq", "neq", "gte", "lte", "order", "limit", "range",
+              "update", "insert", "single", "contains", "is_"):
+        getattr(q, m).return_value = q
+    r = MagicMock()
+    r.data = ticket_data
+    q.execute.return_value = r
+    db = MagicMock()
+    db.table.return_value = q
+    monkeypatch.setattr(agent_module, "get_db", lambda: db)
+
+    result = agent_module._execute_tool("close_ticket", {
+        "ticket_id": "T1",
+        "close_reason": "INVALID_REASON",
+    })
+    import json
+    data = json.loads(result)
+    assert "error" in data
+
+
+# ── merge_tickets ─────────────────────────────────────────────────────────────
+
+def test_merge_tickets_executes_and_logs(monkeypatch):
+    primary = {"ticket_id": "T1", "customer_id": "C1"}
+    secondary = {"ticket_id": "T2", "customer_id": "C1"}
+
+    call_count = [0]
+    def fake_execute():
+        r = MagicMock()
+        if call_count[0] == 0:
+            r.data = [primary]
+        elif call_count[0] == 1:
+            r.data = [secondary]
+        else:
+            r.data = [primary]
+        call_count[0] += 1
+        return r
+
+    q = MagicMock()
+    for m in ("select", "eq", "neq", "gte", "lte", "order", "limit", "range",
+              "update", "insert", "single", "contains", "is_"):
+        getattr(q, m).return_value = q
+    q.execute.side_effect = fake_execute
+    db = MagicMock()
+    db.table.return_value = q
+    monkeypatch.setattr(agent_module, "get_db", lambda: db)
+
+    result = agent_module._execute_tool("merge_tickets", {
+        "primary_ticket_id": "T1",
+        "secondary_ticket_id": "T2",
+    })
+    import json
+    data = json.loads(result)
+    assert data.get("success") is True
+
+
+def test_merge_tickets_rejects_different_customers(monkeypatch):
+    primary = {"ticket_id": "T1", "customer_id": "C1"}
+    secondary = {"ticket_id": "T2", "customer_id": "C2"}
+
+    call_count = [0]
+    def fake_execute():
+        r = MagicMock()
+        r.data = [primary] if call_count[0] == 0 else [secondary]
+        call_count[0] += 1
+        return r
+
+    q = MagicMock()
+    for m in ("select", "eq", "neq", "gte", "lte", "order", "limit", "range",
+              "update", "insert", "single", "contains", "is_"):
+        getattr(q, m).return_value = q
+    q.execute.side_effect = fake_execute
+    db = MagicMock()
+    db.table.return_value = q
+    monkeypatch.setattr(agent_module, "get_db", lambda: db)
+
+    result = agent_module._execute_tool("merge_tickets", {
+        "primary_ticket_id": "T1",
+        "secondary_ticket_id": "T2",
+    })
+    import json
+    data = json.loads(result)
+    assert "error" in data

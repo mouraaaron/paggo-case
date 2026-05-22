@@ -99,10 +99,45 @@ TOOLS = [
                 "required": ["ticket_id"]
             }
         }
-    }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "close_ticket",
+            "description": "Close a ticket with a required close reason. Valid reasons: RESOLVED_FIXED, RESOLVED_INFO, DUPLICATE, NOT_REPRODUCIBLE, WONT_FIX, CUSTOMER_NO_RESPONSE. Ticket must be in RESOLVED status to close.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "ticket_id":    {"type": "string"},
+                    "close_reason": {
+                        "type": "string",
+                        "enum": ["RESOLVED_FIXED", "RESOLVED_INFO", "DUPLICATE",
+                                 "NOT_REPRODUCIBLE", "WONT_FIX", "CUSTOMER_NO_RESPONSE"]
+                    }
+                },
+                "required": ["ticket_id", "close_reason"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "merge_tickets",
+            "description": "Merge a duplicate ticket into a primary ticket. Both tickets must belong to the same customer. The secondary ticket is closed as DUPLICATE; its replies are moved to the primary.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "primary_ticket_id":   {"type": "string", "description": "The ticket to keep"},
+                    "secondary_ticket_id": {"type": "string", "description": "The duplicate ticket to close"}
+                },
+                "required": ["primary_ticket_id", "secondary_ticket_id"]
+            }
+        }
+    },
 ]
 
-WRITE_TOOLS = {"update_ticket_status", "assign_ticket", "classify_ticket"}
+WRITE_TOOLS = {"update_ticket_status", "assign_ticket", "classify_ticket",
+               "close_ticket", "merge_tickets", "draft_reply"}
 
 
 def _execute_tool(name: str, args: dict) -> str:
@@ -185,6 +220,62 @@ def _execute_tool(name: str, args: dict) -> str:
                     "new_value": json.dumps(update)
                 }).execute()
             return json.dumps({"success": True, **update})
+        elif name == "close_ticket":
+            VALID_REASONS = {
+                "RESOLVED_FIXED", "RESOLVED_INFO", "DUPLICATE",
+                "NOT_REPRODUCIBLE", "WONT_FIX", "CUSTOMER_NO_RESPONSE"
+            }
+            if args["close_reason"] not in VALID_REASONS:
+                return json.dumps({"error": f"Invalid close_reason '{args['close_reason']}'. Must be one of {sorted(VALID_REASONS)}"})
+            ticket = db.table("tickets").select("status").eq("ticket_id", args["ticket_id"]).single().execute()
+            current = ticket.data["status"]
+            ok, msg = can_transition(current, "CLOSED")
+            if not ok:
+                return json.dumps({"error": msg})
+            db.table("tickets").update({
+                "status": "CLOSED",
+                "close_reason": args["close_reason"],
+            }).eq("ticket_id", args["ticket_id"]).execute()
+            db.table("audit_log").insert({
+                "ticket_id": args["ticket_id"],
+                "action": "CLOSED",
+                "actor": "AI Agent",
+                "source": "AGENT",
+                "old_value": current,
+                "new_value": "CLOSED",
+                "reason": args["close_reason"],
+            }).execute()
+            return json.dumps({"success": True, "close_reason": args["close_reason"]})
+
+        elif name == "merge_tickets":
+            primary = db.table("tickets").select("ticket_id,customer_id").eq("ticket_id", args["primary_ticket_id"]).execute()
+            secondary = db.table("tickets").select("ticket_id,customer_id").eq("ticket_id", args["secondary_ticket_id"]).execute()
+            if not primary.data or not secondary.data:
+                return json.dumps({"error": "One or both tickets not found"})
+            if primary.data[0]["customer_id"] != secondary.data[0]["customer_id"]:
+                return json.dumps({"error": "Cannot merge tickets from different customers"})
+            db.table("ticket_replies").update({"ticket_id": args["primary_ticket_id"]}).eq("ticket_id", args["secondary_ticket_id"]).execute()
+            db.table("tickets").update({
+                "status": "CLOSED",
+                "merged_into": args["primary_ticket_id"],
+                "close_reason": "DUPLICATE",
+            }).eq("ticket_id", args["secondary_ticket_id"]).execute()
+            db.table("audit_log").insert({
+                "ticket_id": args["primary_ticket_id"],
+                "action": "MERGED",
+                "actor": "AI Agent",
+                "source": "AGENT",
+                "new_value": args["secondary_ticket_id"],
+            }).execute()
+            db.table("audit_log").insert({
+                "ticket_id": args["secondary_ticket_id"],
+                "action": "MERGED_INTO",
+                "actor": "AI Agent",
+                "source": "AGENT",
+                "new_value": args["primary_ticket_id"],
+            }).execute()
+            return json.dumps({"success": True, "primary": args["primary_ticket_id"], "merged": args["secondary_ticket_id"]})
+
         return json.dumps({"error": "unknown tool"})
     except Exception as e:
         return json.dumps({"error": str(e)})
