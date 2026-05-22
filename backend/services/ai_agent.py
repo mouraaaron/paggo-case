@@ -7,9 +7,24 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 SYSTEM_PROMPT = """You are a support triage assistant for Paggo.
 You help support leaders understand and act on support tickets.
-You can look up ticket details, update ticket status, assign tickets, and classify tickets.
-Always confirm before taking write actions. Be concise.
-Call one tool at a time. Wait for the result before calling another."""
+
+Available actions:
+- list_tickets: query tickets with rich filters (segment, status, category, no_reply, date range, sort)
+- get_ticket: fetch full details of one ticket
+- update_ticket_status: change ticket status following state machine rules
+- assign_ticket: assign or reassign a ticket to an agent
+- classify_ticket: set priority and/or category
+- close_ticket: close a ticket with a required reason (RESOLVED_FIXED, RESOLVED_INFO, DUPLICATE, NOT_REPRODUCIBLE, WONT_FIX, CUSTOMER_NO_RESPONSE)
+- merge_tickets: merge a duplicate ticket into a primary ticket (same customer only)
+- draft_reply: generate a personalized reply draft for the leader to review before sending
+
+Rules:
+- Always show a preview and ask for confirmation before executing write actions.
+- For queries affecting multiple tickets (e.g. "escalate all ENT tickets unanswered for 4h"), first list the tickets, confirm the plan, then act.
+- Never invent ticket IDs, customer names, or facts about bugs you don't have.
+- If data is missing, say so and ask.
+- Reply in the same language the leader uses (usually Portuguese).
+- Call one tool at a time. Wait for the result before calling another."""
 
 TOOLS = [
     {
@@ -134,6 +149,25 @@ TOOLS = [
             }
         }
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "draft_reply",
+            "description": (
+                "Generate a personalized reply draft for a ticket based on its real content, "
+                "customer segment, plan, and conversation history. "
+                "The draft will be shown to the leader for review before sending. "
+                "Use this whenever the leader wants to reply to a ticket."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "ticket_id": {"type": "string", "description": "The ticket to draft a reply for"}
+                },
+                "required": ["ticket_id"]
+            }
+        }
+    },
 ]
 
 WRITE_TOOLS = {"update_ticket_status", "assign_ticket", "classify_ticket",
@@ -143,6 +177,46 @@ VALID_CLOSE_REASONS = {
     "RESOLVED_FIXED", "RESOLVED_INFO", "DUPLICATE",
     "NOT_REPRODUCIBLE", "WONT_FIX", "CUSTOMER_NO_RESPONSE"
 }
+
+
+SEGMENT_TONE = {
+    "ENT":  "formal and professional, using polite language appropriate for enterprise clients",
+    "MID":  "professional and clear, balancing warmth with efficiency",
+    "SMB":  "direct and friendly, keeping the response concise",
+    None:   "professional and helpful",
+}
+
+
+def _generate_draft(ticket: dict, replies: list[dict]) -> str:
+    """Generate a reply draft using GPT-4o-mini based on ticket context."""
+    segment = ticket.get("customer_segment")
+    tone = SEGMENT_TONE.get(segment, SEGMENT_TONE[None])
+
+    history_lines = []
+    for r in replies[-5:]:  # last 5 replies for context
+        history_lines.append(f"[{r['author']}]: {r['body']}")
+    history_text = "\n".join(history_lines) if history_lines else "(no previous replies)"
+
+    prompt = (
+        f"You are a support agent at Paggo. Write a reply to the following support ticket.\n\n"
+        f"Customer: {ticket.get('customer_name')} ({segment or 'unknown segment'}, "
+        f"{ticket.get('plan', 'unknown plan')} plan)\n"
+        f"Open tickets from this customer: {ticket.get('previous_open_tickets_for_customer', 0)}\n"
+        f"Subject: {ticket.get('subject')}\n"
+        f"Original message: {ticket.get('body_preview')}\n\n"
+        f"Recent conversation:\n{history_text}\n\n"
+        f"Write a reply in Portuguese. Tone: {tone}. "
+        f"Use the real context of the ticket — do not use generic templates. "
+        f"Do not invent facts about bugs or resolutions you don't know. "
+        f"Keep it under 150 words."
+    )
+
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.4,
+    )
+    return response.choices[0].message.content.strip()
 
 
 def _execute_tool(name: str, args: dict) -> str:
@@ -282,6 +356,33 @@ def _execute_tool(name: str, args: dict) -> str:
             }).execute()
             return json.dumps({"success": True, "primary": args["primary_ticket_id"], "merged": args["secondary_ticket_id"]})
 
+        elif name == "draft_reply":
+            # Confirmation path: draft_body already provided, send it
+            if args.get("draft_body"):
+                db.table("ticket_replies").insert({
+                    "ticket_id": args["ticket_id"],
+                    "body": args["draft_body"],
+                    "author": "AI Agent",
+                    "source": "AGENT",
+                    "is_draft": False,
+                }).execute()
+                db.table("tickets").update({
+                    "last_reply_by": "AGENT"
+                }).eq("ticket_id", args["ticket_id"]).execute()
+                db.table("audit_log").insert({
+                    "ticket_id": args["ticket_id"],
+                    "action": "REPLY_ADDED",
+                    "actor": "AI Agent",
+                    "source": "AGENT",
+                    "new_value": args["draft_body"][:200],
+                }).execute()
+                return json.dumps({"success": True, "draft_body": args["draft_body"]})
+            # Generation path: fetch context, generate draft, return (caller shows preview)
+            ticket_result = db.table("tickets").select("*").eq("ticket_id", args["ticket_id"]).single().execute()
+            replies_result = db.table("ticket_replies").select("author,body").eq("ticket_id", args["ticket_id"]).order("created_at", desc=False).execute()
+            draft = _generate_draft(ticket_result.data, replies_result.data)
+            return json.dumps({"draft_body": draft, "ticket_id": args["ticket_id"]})
+
         return json.dumps({"error": "unknown tool"})
     except Exception as e:
         return json.dumps({"error": str(e)})
@@ -365,6 +466,30 @@ def run_agent(
             }
 
         if name in WRITE_TOOLS:
+            if name == "draft_reply":
+                # Generate draft first, then show for review
+                gen_result = _execute_tool("draft_reply", args)
+                try:
+                    gen_data = json.loads(gen_result)
+                except json.JSONDecodeError:
+                    gen_data = {}
+                draft_body = gen_data.get("draft_body", "")
+                if not draft_body:
+                    return {
+                        "reply": "Não consegui gerar um rascunho para este ticket. Verifique se o ticket_id está correto.",
+                        "pending_action": None,
+                        "updated_history": messages[1:],
+                    }
+                args["draft_body"] = draft_body
+                return {
+                    "reply": (
+                        f"Rascunho gerado para **{args['ticket_id']}**:\n\n"
+                        f"---\n{draft_body}\n---\n\n"
+                        f"Enviar esta resposta?"
+                    ),
+                    "pending_action": {"name": "draft_reply", "args": args, "tool_call_id": tool_call.id},
+                    "updated_history": messages[1:],
+                }
             return {
                 "reply": f"I'd like to call **{name}** with: {json.dumps(args, indent=2)}. Shall I proceed?",
                 "pending_action": {"name": name, "args": args, "tool_call_id": tool_call.id},

@@ -197,3 +197,74 @@ def test_merge_tickets_rejects_different_customers(monkeypatch):
     })
     data = json.loads(result)
     assert "error" in data
+
+
+# ── draft_reply ───────────────────────────────────────────────────────────────
+
+def test_generate_draft_builds_prompt_from_ticket(monkeypatch):
+    """_generate_draft returns a non-empty string using ticket context."""
+    ticket = {
+        "ticket_id": "T1",
+        "subject": "Cannot export invoices",
+        "body_preview": "I have been trying to export my invoices for three days.",
+        "customer_name": "Acme Corp",
+        "customer_segment": "ENT",
+        "plan": "ENTERPRISE",
+        "previous_open_tickets_for_customer": 2,
+    }
+    replies = [
+        {"author": "CUSTOMER", "body": "Still waiting for a response."},
+    ]
+
+    fake_completion = MagicMock()
+    fake_completion.choices[0].message.content = "Dear Acme Corp, we apologize for the delay."
+
+    with patch("services.ai_agent.client.chat.completions.create", return_value=fake_completion):
+        draft = agent_module._generate_draft(ticket, replies)
+
+    assert isinstance(draft, str)
+    assert len(draft) > 10
+
+
+def test_execute_tool_draft_reply_sends_on_confirm(monkeypatch):
+    """_execute_tool('draft_reply') posts reply to DB and logs audit event when draft_body provided."""
+    ticket_row = {
+        "ticket_id": "T1", "subject": "bug", "body_preview": "help",
+        "customer_name": "Acme", "customer_segment": "SMB", "plan": "STARTER",
+        "previous_open_tickets_for_customer": 0,
+    }
+    replies_rows = []
+
+    call_count = [0]
+    def fake_execute():
+        r = MagicMock()
+        if call_count[0] == 0:
+            r.data = ticket_row        # get_ticket (single())
+        elif call_count[0] == 1:
+            r.data = replies_rows      # get replies
+        else:
+            r.data = [{"id": "R1", "ticket_id": "T1", "body": "drafted",
+                       "author": "AI Agent", "created_at": "2026-01-01T00:00:00",
+                       "is_draft": False, "source": "AGENT"}]
+        call_count[0] += 1
+        return r
+
+    q = MagicMock()
+    for m in ("select", "eq", "neq", "gte", "lte", "order", "limit", "range",
+              "update", "insert", "single", "contains", "is_"):
+        getattr(q, m).return_value = q
+    q.execute.side_effect = fake_execute
+    db = MagicMock()
+    db.table.return_value = q
+    monkeypatch.setattr(agent_module, "get_db", lambda: db)
+
+    result = agent_module._execute_tool("draft_reply", {
+        "ticket_id": "T1",
+        "draft_body": "Here is your answer.",
+    })
+
+    data = json.loads(result)
+    assert data.get("success") is True
+    assert "draft_body" in data
+    # reply was inserted
+    q.insert.assert_called()
