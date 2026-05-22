@@ -219,11 +219,11 @@ def test_generate_draft_builds_prompt_from_ticket(monkeypatch):
     fake_completion = MagicMock()
     fake_completion.choices[0].message.content = "Dear Acme Corp, we apologize for the delay."
 
-    with patch("services.ai_agent.client.chat.completions.create", return_value=fake_completion):
+    with patch("services.ai_agent.client.chat.completions.create", return_value=fake_completion) as mock_create:
         draft = agent_module._generate_draft(ticket, replies)
 
-    assert isinstance(draft, str)
-    assert len(draft) > 10
+    assert draft == "Dear Acme Corp, we apologize for the delay."
+    mock_create.assert_called_once()
 
 
 def test_execute_tool_draft_reply_sends_on_confirm(monkeypatch):
@@ -268,3 +268,39 @@ def test_execute_tool_draft_reply_sends_on_confirm(monkeypatch):
     assert "draft_body" in data
     # reply was inserted
     q.insert.assert_called()
+
+
+def test_execute_tool_draft_reply_generates_draft(monkeypatch):
+    """_execute_tool('draft_reply') without draft_body fetches ticket + replies and returns draft_body."""
+    ticket_row = {
+        "ticket_id": "T1", "subject": "bug", "body_preview": "help",
+        "customer_name": "Acme", "customer_segment": "MID", "plan": "PRO",
+        "previous_open_tickets_for_customer": 1,
+    }
+    replies_rows = [{"author": "CUSTOMER", "body": "Please help."}]
+
+    call_count = [0]
+    def fake_execute():
+        r = MagicMock()
+        r.data = ticket_row if call_count[0] == 0 else replies_rows
+        call_count[0] += 1
+        return r
+
+    q = MagicMock()
+    for m in ("select", "eq", "neq", "gte", "lte", "order", "limit", "range",
+              "update", "insert", "single", "contains", "is_"):
+        getattr(q, m).return_value = q
+    q.execute.side_effect = fake_execute
+    db = MagicMock()
+    db.table.return_value = q
+    monkeypatch.setattr(agent_module, "get_db", lambda: db)
+
+    fake_completion = MagicMock()
+    fake_completion.choices[0].message.content = "Olá Acme, estamos investigando o problema."
+
+    with patch("services.ai_agent.client.chat.completions.create", return_value=fake_completion):
+        result = agent_module._execute_tool("draft_reply", {"ticket_id": "T1"})
+
+    data = json.loads(result)
+    assert data.get("draft_body") == "Olá Acme, estamos investigando o problema."
+    assert data.get("ticket_id") == "T1"

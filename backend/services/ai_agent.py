@@ -1,4 +1,5 @@
 import os, json
+from datetime import datetime, timezone
 from openai import OpenAI
 from database import get_db
 from services.state_machine import can_transition
@@ -367,7 +368,8 @@ def _execute_tool(name: str, args: dict) -> str:
                     "is_draft": False,
                 }).execute()
                 db.table("tickets").update({
-                    "last_reply_by": "AGENT"
+                    "last_reply_by": "AGENT",
+                    "last_reply_at": datetime.now(timezone.utc).isoformat(),
                 }).eq("ticket_id", args["ticket_id"]).execute()
                 db.table("audit_log").insert({
                     "ticket_id": args["ticket_id"],
@@ -473,6 +475,12 @@ def run_agent(
                     gen_data = json.loads(gen_result)
                 except json.JSONDecodeError:
                     gen_data = {}
+                if gen_data.get("error"):
+                    return {
+                        "reply": f"Não consegui gerar o rascunho: {gen_data['error']}",
+                        "pending_action": None,
+                        "updated_history": messages[1:],
+                    }
                 draft_body = gen_data.get("draft_body", "")
                 if not draft_body:
                     return {
