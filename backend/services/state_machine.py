@@ -4,8 +4,9 @@ VALID_TRANSITIONS: dict[str, list[str]] = {
     "IN_PROGRESS":      ["WAITING_CUSTOMER", "ESCALATED", "RESOLVED"],
     "WAITING_CUSTOMER": ["IN_PROGRESS"],
     "ESCALATED":        ["IN_PROGRESS", "RESOLVED"],
-    "RESOLVED":         ["CLOSED", "IN_PROGRESS"],
-    "CLOSED":           ["IN_PROGRESS"],
+    "RESOLVED":         ["CLOSED", "REOPENED", "IN_PROGRESS"],
+    "CLOSED":           ["REOPENED"],
+    "REOPENED":         ["IN_PROGRESS", "TRIAGED"],
 }
 
 def can_transition(current: str, target: str) -> tuple[bool, str]:
