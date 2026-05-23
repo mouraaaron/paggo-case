@@ -127,20 +127,4 @@ O script classifica churn via LLM em batches de 25 (cache em `scripts/churn_cach
 |---|---|---|
 | `NEXT_PUBLIC_BACKEND_URL` | não | URL do backend; padrão `http://localhost:8000` |
 
----
 
-## Testes
-
-```powershell
-# Backend (95 testes)
-cd backend
-venv\Scripts\python.exe -m pytest
-
-# Frontend — unit/component (76 testes)
-cd frontend
-npx vitest run
-
-# Frontend — E2E (Playwright)
-cd frontend
-npx playwright test
-```
