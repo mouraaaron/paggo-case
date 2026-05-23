@@ -10,6 +10,7 @@ import {
   closeTicket,
   getTicket,
   sendAgentMessage,
+  suggestClassify,
 } from '@/lib/api'
 
 const AGENTS = [
@@ -77,6 +78,8 @@ export function ActionButtons({ ticket, onUpdate }: ActionButtonsProps) {
   )
   const [classifyError, setClassifyError] = useState('')
   const [classifyLoading, setClassifyLoading] = useState(false)
+  const [suggestLoading, setSuggestLoading] = useState(false)
+  const [suggestReasoning, setSuggestReasoning] = useState('')
 
   // Section C — Assign
   const [agentName, setAgentName] = useState(ticket.assigned_to ?? '')
@@ -119,6 +122,22 @@ export function ActionButtons({ ticket, onUpdate }: ActionButtonsProps) {
       setClassifyError(e instanceof Error ? e.message : 'Error classifying ticket')
     } finally {
       setClassifyLoading(false)
+    }
+  }
+
+  async function handleAiClassify() {
+    setSuggestLoading(true)
+    setSuggestReasoning('')
+    setClassifyError('')
+    try {
+      const s = await suggestClassify(ticket.ticket_id)
+      setSelectedCategory(s.category as Exclude<TicketCategory, null>)
+      setSelectedPriority(s.priority as TicketPriority)
+      setSuggestReasoning(s.reasoning)
+    } catch (e) {
+      setClassifyError(e instanceof Error ? e.message : 'Erro ao sugerir classificação')
+    } finally {
+      setSuggestLoading(false)
     }
   }
 
@@ -218,33 +237,49 @@ export function ActionButtons({ ticket, onUpdate }: ActionButtonsProps) {
           <select
             className="bg-brand-mid border border-brand-border rounded px-2 py-1.5 text-xs text-white flex-1 focus:outline-none focus:border-brand-green cursor-pointer"
             value={selectedPriority}
-            onChange={(e) => setSelectedPriority(e.target.value as TicketPriority)}
+            onChange={(e) => { setSelectedPriority(e.target.value as TicketPriority); setSuggestReasoning('') }}
           >
             {PRIORITY_OPTIONS.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
+              <option key={p} value={p}>{p}</option>
             ))}
           </select>
           <select
             className="bg-brand-mid border border-brand-border rounded px-2 py-1.5 text-xs text-white flex-1 focus:outline-none focus:border-brand-green cursor-pointer"
             value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value as Exclude<TicketCategory, null>)}
+            onChange={(e) => { setSelectedCategory(e.target.value as Exclude<TicketCategory, null>); setSuggestReasoning('') }}
           >
             {CATEGORY_OPTIONS.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
+              <option key={c} value={c}>{c}</option>
             ))}
           </select>
         </div>
-        <button
-          className="bg-brand-green text-brand-black text-xs font-bold px-3 py-1.5 rounded hover:brightness-110 disabled:opacity-40 transition-all cursor-pointer"
-          onClick={handleClassify}
-          disabled={classifyLoading}
-        >
-          {classifyLoading ? '...' : 'Classify'}
-        </button>
+        {suggestReasoning && (
+          <p className="text-[10px] text-brand-green/80 mb-2 italic leading-relaxed">✦ IA: {suggestReasoning}</p>
+        )}
+        <div className="flex gap-2">
+          <button
+            className="bg-brand-green text-brand-black text-xs font-bold px-3 py-1.5 rounded hover:brightness-110 disabled:opacity-40 transition-all cursor-pointer"
+            onClick={handleClassify}
+            disabled={classifyLoading}
+          >
+            {classifyLoading ? '...' : 'Classify'}
+          </button>
+          <button
+            className="border border-brand-border text-brand-muted text-xs font-semibold px-3 py-1.5 rounded hover:border-brand-green hover:text-brand-green disabled:opacity-40 transition-colors cursor-pointer flex items-center gap-1.5"
+            onClick={handleAiClassify}
+            disabled={suggestLoading || classifyLoading}
+            title="Sugerir categoria e prioridade com IA"
+          >
+            {suggestLoading ? (
+              <>
+                <span className="inline-block w-2 h-2 rounded-full bg-brand-green animate-pulse" />
+                Sugerindo...
+              </>
+            ) : (
+              <>✦ Sugerir</>
+            )}
+          </button>
+        </div>
         {classifyError && <p className="text-[10px] text-brand-error mt-1">{classifyError}</p>}
       </section>
 

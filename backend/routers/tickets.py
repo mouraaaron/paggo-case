@@ -6,6 +6,9 @@ from services.audit import log_event
 from services.morning_briefing import generate_morning_briefing
 from datetime import datetime
 from collections import defaultdict
+import openai
+import json as _json
+import os
 
 router = APIRouter(prefix="/tickets", tags=["tickets"])
 
@@ -237,6 +240,47 @@ def get_faq_count(
     faq_count = sum(1 for r in rows if r.get("is_faq"))
     percentage = round(faq_count / total * 100, 1) if total > 0 else 0.0
     return {"faq_count": faq_count, "total": total, "percentage": percentage}
+
+
+@router.post("/{ticket_id}/suggest-classify")
+def suggest_classify(ticket_id: str):
+    db = get_db()
+    result = db.table("tickets").select(
+        "ticket_id,subject,body_preview,customer_segment,plan"
+    ).eq("ticket_id", ticket_id).execute()
+
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    t = result.data[0]
+    prompt = (
+        "You are a B2B SaaS support triage assistant. "
+        "Analyze this support ticket and suggest the best category and priority.\n\n"
+        f"Customer segment: {t.get('customer_segment', 'unknown')}\n"
+        f"Plan: {t.get('plan', 'unknown')}\n"
+        f"Subject: {t.get('subject', '')}\n"
+        f"Body: {t.get('body_preview', '')}\n\n"
+        "Valid categories: BILLING, BUG, FEATURE_REQUEST, HOW_TO, CHURN_SIGNAL, OTHER\n"
+        "Valid priorities: LOW, MEDIUM, HIGH, URGENT\n\n"
+        'Respond with JSON only: {"category": "...", "priority": "...", "reasoning": "one sentence"}'
+    )
+
+    try:
+        oa = openai.OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+        resp = oa.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"},
+            max_tokens=150,
+        )
+        data = _json.loads(resp.choices[0].message.content)
+        return {
+            "category": data.get("category", "OTHER"),
+            "priority": data.get("priority", "MEDIUM"),
+            "reasoning": data.get("reasoning", ""),
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"AI suggestion unavailable: {exc}")
 
 
 @router.get("/{ticket_id}", response_model=TicketOut)

@@ -220,3 +220,15 @@ export function getVolumeByDay(filters?: { createdAfter?: string; createdBefore?
   const qs = params.toString()
   return req<DailyVolumeStat[]>(`/tickets/stats/volume-by-day${qs ? `?${qs}` : ''}`)
 }
+
+export interface ClassifySuggestion {
+  category: string
+  priority: string
+  reasoning: string
+}
+
+export function suggestClassify(ticketId: string): Promise<ClassifySuggestion> {
+  return req<ClassifySuggestion>(`/tickets/${ticketId}/suggest-classify`, {
+    method: 'POST',
+  })
+}
