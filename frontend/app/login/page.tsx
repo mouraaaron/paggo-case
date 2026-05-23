@@ -152,7 +152,7 @@ export default function LoginPage() {
         </form>
 
         <p className="text-center text-brand-muted/40 text-[10px] mt-8 tracking-widest uppercase">
-          Paggo University · Tech Internship 2025
+          Paggo University · Tech Internship 2026
         </p>
       </div>
     </div>

@@ -59,7 +59,7 @@ export function KanbanBoard() {
     created_before: '2026-03-31',
   })
   const [visibleStatuses, setVisibleStatuses] = useState<Set<string>>(
-    new Set(COLUMNS.map(c => c.status))
+    new Set(COLUMNS.map(c => c.status).filter(s => s !== 'CLOSED' && s !== 'RESOLVED'))
   )
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
   const [draggingTicket, setDraggingTicket] = useState<Ticket | null>(null)
