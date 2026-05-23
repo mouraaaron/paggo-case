@@ -10,12 +10,13 @@ Aplicação full-stack para triagem de ~8.000 tickets de suporte, construída co
 
 ## Funcionalidades
 
-- **Kanban de tickets** — visão em colunas por status, cards coloridos por prioridade, filtros por data, segmento, agente, canal, flag e categoria
+- **Kanban de tickets** — visão em colunas por status, cards coloridos por prioridade, filtros por data, segmento, agente, canal, flag, categoria e ordenação (risco / mais recentes / mais antigos / sem resposta)
 - **Painel de alertas lateral** — tickets críticos (score ≥ 70) em destaque em tempo real, respeitando os filtros de data ativos
-- **Stats bottom bar** — três painéis: balanceamento de carga por agente, volume de tickets por segmento (ENT/MID/SMB) e score de risco médio por segmento
+- **Stats bottom bar** — quatro painéis: balanceamento de carga por agente, volume de tickets por segmento (ENT/MID/SMB), score de risco médio por segmento e volume por dia (gráfico de barras)
 - **Morning Briefing** — botão disponível quando o filtro de datas cobre até 3 dias; gera um resumo via GPT-4o-mini com total de novos tickets por segmento, status da equipe e próximos passos em português; o resultado fica em cache e pode ser reaberto sem nova chamada à API
 - **Prioridade automática** — calculada pelo sistema de triagem, nunca pelo cliente: `≥ 70 → URGENT` · `40–69 → HIGH` · `10–39 → MEDIUM` · `< 10 → LOW`
-- **Detalhe do ticket** — painel lateral com audit log, respostas, mudança de status, atribuição, classificação, encerramento e merge
+- **Detalhe do ticket** — painel lateral com audit log, respostas, mudança de status, atribuição, classificação com sugestão via IA (GPT-4o-mini), encerramento e merge
+- **Auto-sugestão de categoria e prioridade** — botão "✦ Sugerir" em cada ticket chama GPT-4o-mini e pré-preenche os campos com o raciocínio exibido; aceite com um clique
 - **Agente de IA** — assistente conversacional (GPT-4o-mini + tool calling) que lê tickets e executa ações com confirmação humana obrigatória antes de qualquer escrita
 - **Máquina de estados** — transições inválidas retornam HTTP 422
 - **Audit log** — cada mutação registrada com ator, origem (USER vs AGENT) e valores anterior/posterior
@@ -45,13 +46,16 @@ Score final é a soma dos pontos ativos, limitado a 100. Tickets com score ≥ 7
 
 | Ferramenta | Tipo | Descrição |
 |---|---|---|
-| `get_ticket` | Leitura | Retorna todos os detalhes de um ticket |
-| `list_tickets` | Leitura | Lista tickets com filtros opcionais |
-| `update_ticket_status` | **Escrita** | Altera o status (respeita a máquina de estados) |
-| `assign_ticket` | **Escrita** | Atribui o ticket a um agente |
+| `get_ticket` | Leitura | Retorna todos os detalhes de um ticket pelo ID |
+| `list_tickets` | Leitura | Lista tickets com filtros opcionais (status, segmento, agente, `unassigned`, `no_reply`, etc.) |
+| `update_ticket_status` | **Escrita** | Altera o status do ticket respeitando a máquina de estados |
+| `assign_ticket` | **Escrita** | Atribui ou reatribui o ticket a um agente |
 | `classify_ticket` | **Escrita** | Define prioridade e/ou categoria |
+| `close_ticket` | **Escrita** | Fecha o ticket com um dos 6 motivos válidos |
+| `merge_tickets` | **Escrita** | Mescla dois tickets do mesmo cliente, preservando o histórico de respostas de ambos |
+| `draft_reply` | **Escrita** | Gera um rascunho de resposta adaptado ao segmento do cliente (ENT: formal, MID: profissional, SMB: direto) e confirma o envio |
 
-Ações de escrita exigem confirmação explícita do usuário. Todas as ações do agente são registradas no audit log com `source: AGENT`.
+Todas as ferramentas de escrita retornam um `pending_action` e exigem confirmação explícita do usuário no chat antes de qualquer commit. Todas as ações do agente são registradas no audit log com `source: AGENT`.
 
 ---
 
@@ -125,11 +129,11 @@ O script classifica churn via LLM em batches de 25 (cache em `scripts/churn_cach
 ## Testes
 
 ```powershell
-# Backend (25 testes)
+# Backend (95 testes)
 cd backend
 venv\Scripts\python.exe -m pytest
 
-# Frontend — unit/component (34 testes)
+# Frontend — unit/component (76 testes)
 cd frontend
 npx vitest run
 
