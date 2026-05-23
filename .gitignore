@@ -6,3 +6,16 @@ venv/
 node_modules/
 .next/
 backend/tickets.csv
+
+# AI tooling — not for reviewers
+CLAUDE.md
+.claude/
+.superpowers/
+docs/superpowers/
+frontend/AGENTS.md
+read_pdf.py
+read_brand.py
+video-script.md
+backend/import_log.txt
+backend/import_stdout.txt
+backend/import_stderr.txt
