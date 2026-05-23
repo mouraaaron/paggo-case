@@ -136,6 +136,33 @@ def get_risk_by_segment(
     ]
 
 
+@router.get("/stats/volume-by-day")
+def get_volume_by_day(
+    created_after: str | None = Query(None),
+    created_before: str | None = Query(None),
+):
+    db = get_db()
+    query = db.table("tickets").select("created_at")
+    if created_after:
+        query = query.gte("created_at", created_after)
+    if created_before:
+        query = query.lte("created_at", f"{created_before}T23:59:59.999999")
+    result = query.execute()
+
+    counts: dict[str, int] = {}
+    for row in result.data:
+        raw = row.get("created_at")
+        if not raw:
+            continue
+        date_str = str(raw)[:10]  # "YYYY-MM-DD"
+        counts[date_str] = counts.get(date_str, 0) + 1
+
+    return sorted(
+        [{"date": d, "count": c} for d, c in counts.items()],
+        key=lambda x: x["date"],
+    )
+
+
 @router.get("/stats/agents")
 def get_agent_stats(
     created_after: str | None = Query(None),

@@ -207,3 +207,16 @@ export function getFaqCount(filters?: { createdAfter?: string; createdBefore?: s
   const qs = params.toString()
   return req<FaqCountData>(`/tickets/stats/faq-count${qs ? `?${qs}` : ''}`)
 }
+
+export interface DailyVolumeStat {
+  date: string   // "YYYY-MM-DD"
+  count: number
+}
+
+export function getVolumeByDay(filters?: { createdAfter?: string; createdBefore?: string }): Promise<DailyVolumeStat[]> {
+  const params = new URLSearchParams()
+  if (filters?.createdAfter) params.set('created_after', filters.createdAfter)
+  if (filters?.createdBefore) params.set('created_before', filters.createdBefore)
+  const qs = params.toString()
+  return req<DailyVolumeStat[]>(`/tickets/stats/volume-by-day${qs ? `?${qs}` : ''}`)
+}

@@ -425,3 +425,27 @@ def test_assign_ticket_response_includes_all_ticket_fields(monkeypatch):
     assert body["risk_score"] == 75
     assert body["priority"] == "URGENT"
     assert body["assigned_to"] == "Bruno Lima"
+
+
+def test_volume_by_day_groups_by_date(monkeypatch):
+    rows = [
+        {"created_at": "2026-01-01T10:00:00"},
+        {"created_at": "2026-01-01T14:00:00"},
+        {"created_at": "2026-01-02T09:00:00"},
+    ]
+    db, _ = _chainable(rows)
+    monkeypatch.setattr(routers.tickets, "get_db", lambda: db)
+    r = client.get("/tickets/stats/volume-by-day?created_after=2026-01-01&created_before=2026-01-02")
+    assert r.status_code == 200
+    data = r.json()
+    assert {"date": "2026-01-01", "count": 2} in data
+    assert {"date": "2026-01-02", "count": 1} in data
+    assert len(data) == 2
+
+
+def test_volume_by_day_returns_empty_list_when_no_tickets(monkeypatch):
+    db, _ = _chainable([])
+    monkeypatch.setattr(routers.tickets, "get_db", lambda: db)
+    r = client.get("/tickets/stats/volume-by-day")
+    assert r.status_code == 200
+    assert r.json() == []

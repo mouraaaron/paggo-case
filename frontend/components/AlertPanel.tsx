@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Ticket } from '@/types'
-import { getTickets, getVolumeBySegment, getRiskBySegment, getAgentStats, getMorningBriefing, getFaqCount } from '@/lib/api'
-import type { SegmentVolumeStat, SegmentRiskStat, AgentStat, MorningBriefingData, FaqCountData } from '@/lib/api'
+import { getTickets, getVolumeBySegment, getRiskBySegment, getAgentStats, getMorningBriefing, getFaqCount, getVolumeByDay } from '@/lib/api'
+import type { SegmentVolumeStat, SegmentRiskStat, AgentStat, MorningBriefingData, FaqCountData, DailyVolumeStat } from '@/lib/api'
 import { MorningBriefingModal } from '@/components/MorningBriefingModal'
 
 export function timeAgo(dateStr: string | null): string {
@@ -235,6 +235,44 @@ function RiskBySegmentChart({ stats }: { stats: SegmentRiskStat[] }) {
   )
 }
 
+function VolumeByDayChart({ stats }: { stats: DailyVolumeStat[] }) {
+  if (stats.length === 0) {
+    return <p className="text-xs text-brand-muted text-center py-2">Sem dados para o período selecionado</p>
+  }
+  const maxCount = Math.max(...stats.map(s => s.count), 1)
+  const visible = stats.slice(-60)
+
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-end gap-px h-20">
+        {visible.map(({ date, count }) => {
+          const heightPct = Math.max(4, (count / maxCount) * 100)
+          return (
+            <div
+              key={date}
+              className="flex-1 min-w-0 rounded-t-sm bg-brand-green/40 hover:bg-brand-green/70 transition-colors cursor-default"
+              style={{ height: `${heightPct}%` }}
+              title={`${date}: ${count} ticket${count !== 1 ? 's' : ''}`}
+            />
+          )
+        })}
+      </div>
+      <div className="flex justify-between">
+        <span className="text-[8px] text-brand-border">{visible[0].date.slice(5)}</span>
+        {visible.length > 2 && (
+          <span className="text-[8px] text-brand-border">
+            {visible[Math.floor(visible.length / 2)].date.slice(5)}
+          </span>
+        )}
+        <span className="text-[8px] text-brand-border">{visible[visible.length - 1].date.slice(5)}</span>
+      </div>
+      <p className="text-[8px] text-brand-border pt-0.5">
+        passe o mouse sobre cada barra para ver o valor
+      </p>
+    </div>
+  )
+}
+
 // --- StatsBottomBar: horizontal section below kanban with Agentes + Response Time ---
 
 interface StatsBottomBarProps {
@@ -253,6 +291,7 @@ export function StatsBottomBar({ createdAfter, createdBefore, refreshKey }: Stat
   const hasData = useRef(false)
 
   const [faqStats, setFaqStats] = useState<FaqCountData>({ faq_count: 0, total: 0, percentage: 0 })
+  const [dailyVolumeStats, setDailyVolumeStats] = useState<DailyVolumeStat[]>([])
 
   const [briefingData, setBriefingData] = useState<MorningBriefingData | null>(null)
   const [briefingOpen, setBriefingOpen] = useState(false)
@@ -295,17 +334,19 @@ export function StatsBottomBar({ createdAfter, createdBefore, refreshKey }: Stat
       }
       setError(false)
       try {
-        const [agents, volume, risk, faq] = await Promise.all([
+        const [agents, volume, risk, faq, daily] = await Promise.all([
           getAgentStats({ createdAfter, createdBefore }),
           getVolumeBySegment({ createdAfter, createdBefore }),
           getRiskBySegment({ createdAfter, createdBefore }),
           getFaqCount({ createdAfter, createdBefore }),
+          getVolumeByDay({ createdAfter, createdBefore }),
         ])
         if (cancelled) return
         setAgentStats(agents)
         setVolumeStats(volume)
         setRiskStats(risk)
         setFaqStats(faq)
+        setDailyVolumeStats(daily)
         hasData.current = true
       } catch {
         if (!cancelled) setError(true)
@@ -437,6 +478,19 @@ export function StatsBottomBar({ createdAfter, createdBefore, refreshKey }: Stat
           Score de risco médio por segmento
         </p>
         <RiskBySegmentChart stats={riskStats} />
+      </div>
+
+      {/* Volume por Dia */}
+      <div className="flex-1 border-r border-brand-border p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <p className="text-[10px] text-brand-muted uppercase tracking-wider font-semibold">
+            Volume por dia
+          </p>
+          {refreshing && (
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-brand-green animate-pulse" />
+          )}
+        </div>
+        <VolumeByDayChart stats={dailyVolumeStats} />
       </div>
 
       {/* Tickets FAQ */}
