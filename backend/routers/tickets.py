@@ -279,8 +279,8 @@ def suggest_classify(ticket_id: str):
             "priority": data.get("priority", "MEDIUM"),
             "reasoning": data.get("reasoning", ""),
         }
-    except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"AI suggestion unavailable: {exc}")
+    except Exception:
+        raise HTTPException(status_code=503, detail="AI suggestion unavailable")
 
 
 @router.get("/{ticket_id}", response_model=TicketOut)

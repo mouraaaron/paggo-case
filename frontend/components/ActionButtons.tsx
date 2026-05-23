@@ -116,6 +116,7 @@ export function ActionButtons({ ticket, onUpdate }: ActionButtonsProps) {
     setClassifyError('')
     setClassifyLoading(true)
     try {
+      setSuggestReasoning('')
       const updated = await classifyTicket(ticket.ticket_id, selectedCategory, selectedPriority)
       onUpdate(updated)
     } catch (e) {
