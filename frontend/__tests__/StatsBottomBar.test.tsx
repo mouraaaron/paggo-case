@@ -216,4 +216,37 @@ describe('StatsBottomBar', () => {
       })
     })
   })
+
+  it('renders Volume por Dia panel heading and date labels when data is present', async () => {
+    vi.mocked(getAgentStats).mockResolvedValue([])
+    vi.mocked(getVolumeBySegment).mockResolvedValue([])
+    vi.mocked(getRiskBySegment).mockResolvedValue([])
+    vi.mocked(getVolumeByDay).mockResolvedValue([
+      { date: '2024-01-15', count: 12 },
+      { date: '2024-01-16', count: 7 },
+    ])
+
+    render(<StatsBottomBar />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Volume por dia')).toBeInTheDocument()
+      expect(screen.getByText('01-15')).toBeInTheDocument()
+      expect(screen.getByText('01-16')).toBeInTheDocument()
+    })
+  })
+
+  it('renders Volume por Dia empty state when no data', async () => {
+    vi.mocked(getAgentStats).mockResolvedValue([])
+    vi.mocked(getVolumeBySegment).mockResolvedValue([])
+    vi.mocked(getRiskBySegment).mockResolvedValue([])
+    vi.mocked(getVolumeByDay).mockResolvedValue([])
+
+    render(<StatsBottomBar />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Volume por dia')).toBeInTheDocument()
+      const emptyMessages = screen.getAllByText('Sem dados para o período selecionado')
+      expect(emptyMessages.length).toBeGreaterThan(0)
+    })
+  })
 })
