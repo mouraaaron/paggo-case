@@ -178,7 +178,7 @@ export function ActionButtons({ ticket, onUpdate }: ActionButtonsProps) {
     setAiLoading(true)
     setReplyError('')
     try {
-      const prompt = `Redija uma resposta para o ticket ${ticket.ticket_id}.`
+      const prompt = `Redija uma resposta para o ticket ${ticket.ticket_id}.\n\nAssunto: ${ticket.subject}\nConteúdo: ${ticket.body_preview}\nSegmento: ${ticket.customer_segment}\nPrioridade: ${ticket.priority}`
       const { reply } = await sendAgentMessage(prompt, [])
       // draft_reply wraps text between --- markers; extract just the draft body
       const match = reply.match(/---\n([\s\S]+?)\n---/)
