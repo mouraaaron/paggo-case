@@ -38,11 +38,16 @@ frontend/ (Next.js, Vercel)
     app/inbox/page.tsx          → ticket list (KanbanBoard)
     app/tickets/[id]/page.tsx   → ticket detail (server component)
     app/agent/page.tsx          → AI chat
+    app/login/page.tsx          → login page (illustrative auth)
+    proxy.ts                    → server-side auth guard (Next.js 16 proxy)
     components/                 → KanbanBoard, KanbanColumn, KanbanCard,
-                                   TicketDetailPanel, ActionButtons, AuditLog,
+                                   TicketDetailPanel, TicketSidePanel,
+                                   ActionButtons, AuditLog,
                                    AgentChat, TriageBadge,
                                    AlertPanel (AlertsSidebar + StatsBottomBar),
-                                   MorningBriefingModal
+                                   MorningBriefingModal,
+                                   AppShell, AppSidebar (layout + nav),
+                                   AuthGuard (client-side auth check)
     lib/api.ts                  → all fetch calls, single BASE constant
     types/index.ts              → shared TypeScript types
           ↕ HTTP (NEXT_PUBLIC_BACKEND_URL)
@@ -86,18 +91,22 @@ Supabase (PostgreSQL)
 - `MULTIPLE_OPEN` — customer has ≥3 other open tickets → **+15**
 - `STALE_IN_PROGRESS` — IN_PROGRESS, no activity for 72h → **+15**
 
-**Stats endpoints return aggregated data, not raw tickets.** Three endpoints under `/tickets/stats/`:
+**Stats endpoints return aggregated data, not raw tickets.** Endpoints under `/tickets/stats/`:
 - `GET /tickets/stats/agents` — open ticket count per agent broken down by priority (excludes CLOSED/RESOLVED)
 - `GET /tickets/stats/volume-by-segment` — total/open/closed count per segment (ENT/MID/SMB)
 - `GET /tickets/stats/risk-by-segment` — average risk score per segment
+- `GET /tickets/stats/volume-by-day` — ticket count per calendar day (used by Volume por Dia bar chart)
+- `GET /tickets/stats/faq-count` — count and percentage of tickets with `is_faq=true`
 - `GET /tickets/stats/morning-briefing` — AI-generated briefing for a period of ≤3 days (see Morning Briefing section below)
-All four accept `created_after` and `created_before` date filters.
+All accept `created_after` and `created_before` date filters.
+
+**`POST /tickets/{ticket_id}/suggest-classify`** — calls GPT-4o-mini with the ticket's subject and body, returns `{category, priority, reasoning}`. Returns HTTP 503 with a generic message on OpenAI failure (never exposes exception detail). Route is registered before the `/{ticket_id}` catch-all.
 
 **Morning Briefing** — endpoint `GET /tickets/stats/morning-briefing?created_after=...&created_before=...` validates that both params are present and that the range is ≤3 days (400 otherwise). The service `services/morning_briefing.py` runs two Supabase queries: (1) tickets created in the period (period-scoped) to count by segment and detect unassigned urgent tickets; (2) all open assigned tickets (not period-scoped) to compute current agent overload. It then calls GPT-4o-mini with `response_format={"type":"json_object"}` to generate `narrative` (1-2 sentences in Portuguese) and `next_steps` (3-5 action items in Portuguese starting with an infinitive verb). On parse failure the service returns `narrative=""` and `next_steps=[]` without crashing.
 
 **Morning Briefing frontend caching** — `StatsBottomBar` caches the last generated `MorningBriefingData` in state. A `useEffect` on `[createdAfter, createdBefore]` clears the cache when the date range changes. First click → calls API, sets data, opens modal, button label becomes "Ver Morning Briefing". Subsequent clicks → opens modal directly without calling the API. This means one API call per date range per session.
 
-**Alert panel layout** — the inbox page uses a layout with kanban on the left, `AlertsSidebar` on the right (fixed 320px), and `StatsBottomBar` below. `AlertsSidebar` shows tickets with `risk_score ≥ 70`. `StatsBottomBar` has three panels: Balanceamento de agentes · Volume por segmento · Score de risco médio por segmento. All panels respect the active date filter via `createdAfter`/`createdBefore` props and a `refreshKey` counter that increments on ticket mutations.
+**Alert panel layout** — the inbox page uses a layout with kanban on the left, `AlertsSidebar` on the right (fixed 320px), and `StatsBottomBar` below. `AlertsSidebar` shows tickets with `risk_score ≥ 70`. `StatsBottomBar` has four panels: Balanceamento de agentes · Volume por segmento · Score de risco médio por segmento · Volume por dia (CSS bar chart, no charting library). All panels respect the active date filter via `createdAfter`/`createdBefore` props and a `refreshKey` counter that increments on ticket mutations.
 
 **StatsBottomBar uses stale-while-revalidate** via a `hasData` ref. On re-fetch (date filter change or refreshKey bump), existing data stays visible and a pulse dot appears instead of a full loading screen.
 
@@ -107,7 +116,7 @@ All four accept `created_after` and `created_before` date filters.
 
 **Agent conversation history is stateless** — the entire `updated_history` array is sent back from the client on every turn. The backend does not store session state.
 
-**Agent write-tool confirmation flow** — when the agent wants to call a write tool (`update_ticket_status`, `assign_ticket`, `classify_ticket`), it returns `pending_action` instead of executing. The frontend shows a confirmation banner; on confirm, the frontend sends `confirmed_action` back and the backend executes it. The `message` field is an empty string on confirm turns — the backend ignores it when `confirmed_action` is set.
+**Agent write-tool confirmation flow** — when the agent wants to call a write tool (`update_ticket_status`, `assign_ticket`, `classify_ticket`, `close_ticket`, `merge_tickets`, `draft_reply`), it returns `pending_action` instead of executing. The frontend shows a confirmation banner; on confirm, the frontend sends `confirmed_action` back and the backend executes it. The `message` field is an empty string on confirm turns — the backend ignores it when `confirmed_action` is set.
 
 **Invalid status transitions return HTTP 422**, not 400. The state machine (`services/state_machine.py`) and its frontend mirror (`frontend/lib/stateMachine.ts`) define the allowed transitions. Both files must be kept in sync.
 
@@ -122,6 +131,10 @@ All four accept `created_after` and `created_before` date filters.
 | `RESOLVED` | `CLOSED`, `REOPENED`, `IN_PROGRESS` |
 | `CLOSED` | `REOPENED` (not `IN_PROGRESS` — must go through REOPENED for audit trail) |
 | `REOPENED` | `IN_PROGRESS`, `TRIAGED` |
+
+**KanbanBoard filters** — `GlobalFilters` type has: `status`, `priority`, `segment`, `channel`, `assigned_to`, `category`, `has_flag`, `created_after`, `created_before`, `sort_by` (`risk_score` | `created_at` | `last_reply_at`), `sort_desc`. Default date range is 2026-03-29 to 2026-03-31. CLOSED and RESOLVED columns are hidden by default (togglable). All filter changes use 300ms debounce before triggering `loadColumns`.
+
+**Illustrative authentication** — login page (`app/login/page.tsx`) accepts only `admin123` / `1234`. On success it sets `document.cookie = 'paggo_auth=ok'` and navigates to `/inbox`. Protection is dual-layer: `proxy.ts` (Next.js 16 server-side proxy) checks the cookie on every HTTP request and redirects to `/login` if absent; `AuthGuard` (client component) checks on mount and calls `router.replace('/login')` if the cookie is missing. `AppSidebar` uses `usePathname()` and returns `null` on `/login`, so no nav links appear before login.
 
 **tsconfig.json excludes test files from Next.js type check.** `vitest.config.mts`, `vitest.setup.ts`, `__tests__/`, `e2e/`, and `playwright.config.ts` are in the `exclude` list. Without this, Next.js's type checker picks up `vitest.config.mts` via the `**/*.mts` include pattern and fails due to a Vite version conflict between Next.js and vitest's bundled Vite.
 

@@ -4,13 +4,16 @@
 
 Aplicação full-stack para triagem de ~8.000 tickets de suporte, construída com FastAPI + Next.js + Supabase + OpenAI.
 
-**Demo:** https://paggo-case-gules.vercel.app/inbox
+**Demo:** https://paggo-case-gules.vercel.app
+
+**Credenciais de acesso:** login `admin123` · senha `1234`
 
 ---
 
 ## Funcionalidades
 
-- **Kanban de tickets** — visão em colunas por status, cards coloridos por prioridade, filtros por data, segmento, agente, canal, flag, categoria e ordenação (risco / mais recentes / mais antigos / sem resposta)
+- **Autenticação ilustrativa** — tela de login com branding Paggo; proteção dupla via `proxy.ts` (servidor) e `AuthGuard` (cliente); sidebar e rotas bloqueadas antes do login
+- **Kanban de tickets** — visão em colunas por status, cards coloridos por prioridade, filtros por data, segmento, agente, canal, flag, categoria e ordenação (risco / mais recentes / mais antigos / sem resposta); colunas CLOSED e RESOLVED ocultas por padrão
 - **Painel de alertas lateral** — tickets críticos (score ≥ 70) em destaque em tempo real, respeitando os filtros de data ativos
 - **Stats bottom bar** — quatro painéis: balanceamento de carga por agente, volume de tickets por segmento (ENT/MID/SMB), score de risco médio por segmento e volume por dia (gráfico de barras)
 - **Morning Briefing** — botão disponível quando o filtro de datas cobre até 3 dias; gera um resumo via GPT-4o-mini com total de novos tickets por segmento, status da equipe e próximos passos em português; o resultado fica em cache e pode ser reaberto sem nova chamada à API
