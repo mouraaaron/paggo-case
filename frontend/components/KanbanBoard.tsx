@@ -12,7 +12,7 @@ import {
   useSensors,
 } from '@dnd-kit/core'
 import { Ticket, TicketStatus } from '@/types'
-import { getTickets, updateStatus } from '@/lib/api'
+import { getTickets, updateStatus, getAgents } from '@/lib/api'
 import { canTransition } from '@/lib/stateMachine'
 import { KanbanColumn } from './KanbanColumn'
 import { KanbanCard } from './KanbanCard'
@@ -33,9 +33,20 @@ const COLUMNS = [
 const PRIORITIES = ['', 'LOW', 'MEDIUM', 'HIGH', 'URGENT']
 const SEGMENTS = ['', 'SMB', 'MID', 'ENT']
 const FLAGS = ['', 'CHURN_UNASSIGNED', 'ENT_NO_REPLY_2H', 'CHURN_SIGNAL', 'MID_NO_REPLY_2H', 'MULTIPLE_OPEN', 'STALE_IN_PROGRESS']
+const CHANNELS = ['', 'EMAIL', 'CHAT', 'WHATSAPP', 'PHONE_CALLBACK']
 
 type ColumnData = Record<string, Ticket[]>
-type GlobalFilters = { priority?: string; segment?: string; has_flag?: string; created_after?: string; created_before?: string }
+type GlobalFilters = {
+  priority?: string
+  segment?: string
+  has_flag?: string
+  created_after?: string
+  created_before?: string
+  channel?: string
+  assigned_to?: string
+  sort_by?: string
+  sort_desc?: boolean
+}
 type PendingTransition = { ticket: Ticket; sourceColKey: string; targetStatus: string }
 
 export function KanbanBoard() {
@@ -55,6 +66,11 @@ export function KanbanBoard() {
   const [pendingTransition, setPendingTransition] = useState<PendingTransition | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const [statsRefreshKey, setStatsRefreshKey] = useState(0)
+  const [agents, setAgents] = useState<string[]>([])
+
+  useEffect(() => {
+    getAgents().then(setAgents).catch(() => {})
+  }, [])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -82,13 +98,26 @@ export function KanbanBoard() {
             ...filters,
             status: s,
             limit: 50,
-            sort_by: 'risk_score',
-            sort_desc: true,
+            sort_by: filters.sort_by ?? 'risk_score',
+            sort_desc: filters.sort_desc !== undefined ? filters.sort_desc : true,
           })
         )
       ).then(results => ({
         key: col.status,
-        tickets: results.flat().sort((a, b) => b.risk_score - a.risk_score),
+        tickets: results.flat().sort((a, b) => {
+          const by = filters.sort_by ?? 'risk_score'
+          const desc = filters.sort_desc !== false
+          if (by === 'created_at') {
+            const diff = new Date(a.created_at ?? 0).getTime() - new Date(b.created_at ?? 0).getTime()
+            return desc ? -diff : diff
+          }
+          if (by === 'last_reply_at') {
+            const av = a.last_reply_at ? new Date(a.last_reply_at).getTime() : 0
+            const bv = b.last_reply_at ? new Date(b.last_reply_at).getTime() : 0
+            return desc ? bv - av : av - bv
+          }
+          return b.risk_score - a.risk_score
+        }),
       }))
     })
 
@@ -235,6 +264,37 @@ export function KanbanBoard() {
           onChange={e => setFilter('has_flag', e.target.value)}
         >
           {FLAGS.map(f => <option key={f} value={f}>{f || 'Flag'}</option>)}
+        </select>
+
+        <select
+          className="bg-brand-mid border border-brand-border text-brand-muted px-2 py-1.5 rounded text-xs focus:outline-none focus:border-brand-green cursor-pointer"
+          value={filters.channel ?? ''}
+          onChange={e => setFilter('channel', e.target.value)}
+        >
+          {CHANNELS.map(c => <option key={c} value={c}>{c || 'Canal'}</option>)}
+        </select>
+
+        <select
+          className="bg-brand-mid border border-brand-border text-brand-muted px-2 py-1.5 rounded text-xs focus:outline-none focus:border-brand-green cursor-pointer"
+          value={filters.assigned_to ?? ''}
+          onChange={e => setFilter('assigned_to', e.target.value)}
+        >
+          <option value="">Agente</option>
+          {agents.map(a => <option key={a} value={a}>{a}</option>)}
+        </select>
+
+        <select
+          className="bg-brand-mid border border-brand-border text-brand-muted px-2 py-1.5 rounded text-xs focus:outline-none focus:border-brand-green cursor-pointer"
+          value={`${filters.sort_by ?? 'risk_score'}:${filters.sort_desc !== false ? 'desc' : 'asc'}`}
+          onChange={e => {
+            const [by, dir] = e.target.value.split(':')
+            setFilters(f => ({ ...f, sort_by: by, sort_desc: dir === 'desc' }))
+          }}
+        >
+          <option value="risk_score:desc">Risco ↓</option>
+          <option value="created_at:desc">Mais recentes</option>
+          <option value="created_at:asc">Mais antigos</option>
+          <option value="last_reply_at:asc">Sem resposta há mais tempo</option>
         </select>
 
         <DateRangePicker
