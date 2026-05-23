@@ -9,9 +9,10 @@ vi.mock('@/lib/api', () => ({
   getRiskBySegment: vi.fn(),
   getFaqCount: vi.fn(),
   getMorningBriefing: vi.fn(),
+  getVolumeByDay: vi.fn(),
 }))
 
-import { getAgentStats, getVolumeBySegment, getRiskBySegment, getFaqCount } from '@/lib/api'
+import { getAgentStats, getVolumeBySegment, getRiskBySegment, getFaqCount, getVolumeByDay } from '@/lib/api'
 
 const mockAgentStats: AgentStat[] = [
   { agent: 'Ana Souza', urgent: 1, high: 2, medium: 0, low: 0, total: 3 },
@@ -34,6 +35,7 @@ describe('StatsBottomBar', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(getFaqCount).mockResolvedValue({ faq_count: 0, total: 0, percentage: 0 })
+    vi.mocked(getVolumeByDay).mockResolvedValue([])
   })
 
   it('shows loading state on first render', () => {
