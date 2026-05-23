@@ -449,3 +449,13 @@ def test_volume_by_day_returns_empty_list_when_no_tickets(monkeypatch):
     r = client.get("/tickets/stats/volume-by-day")
     assert r.status_code == 200
     assert r.json() == []
+
+
+def test_volume_by_day_date_filter_sent_to_query(monkeypatch):
+    db, q = _chainable([])
+    monkeypatch.setattr(routers.tickets, "get_db", lambda: db)
+
+    client.get("/tickets/stats/volume-by-day?created_after=2024-01-01&created_before=2024-01-31")
+
+    q.gte.assert_called_with("created_at", "2024-01-01")
+    q.lte.assert_called_with("created_at", "2024-01-31T23:59:59.999999")
