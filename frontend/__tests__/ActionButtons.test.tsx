@@ -12,9 +12,10 @@ vi.mock('@/lib/api', () => ({
   getTicket: vi.fn(),
   closeTicket: vi.fn(),
   sendAgentMessage: vi.fn(),
+  suggestClassify: vi.fn(),
 }))
 
-import { sendAgentMessage, assignTicket, getTicket } from '@/lib/api'
+import { sendAgentMessage, assignTicket, getTicket, suggestClassify, classifyTicket } from '@/lib/api'
 
 const makeTicket = (overrides: Partial<Ticket> = {}): Ticket => ({
   ticket_id: 'TKT-001',
@@ -199,6 +200,112 @@ describe('ActionButtons — Assign agent', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Assign failed')).toBeInTheDocument()
+    })
+  })
+})
+
+describe('ActionButtons — AI classify suggest', () => {
+  const onUpdate = vi.fn()
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('renders the Sugerir button', () => {
+    render(<ActionButtons ticket={makeTicket()} onUpdate={onUpdate} />)
+    expect(screen.getByTitle(/sugerir categoria e prioridade/i)).toBeInTheDocument()
+  })
+
+  it('calls suggestClassify with ticket_id on click', async () => {
+    vi.mocked(suggestClassify).mockResolvedValue({
+      category: 'BUG', priority: 'HIGH', reasoning: 'Test reason',
+    })
+    const user = userEvent.setup()
+    render(<ActionButtons ticket={makeTicket({ ticket_id: 'TKT-999' })} onUpdate={onUpdate} />)
+
+    await user.click(screen.getByTitle(/sugerir categoria e prioridade/i))
+
+    await waitFor(() => {
+      expect(vi.mocked(suggestClassify)).toHaveBeenCalledWith('TKT-999')
+    })
+  })
+
+  it('updates category and priority dropdowns with AI suggestion', async () => {
+    vi.mocked(suggestClassify).mockResolvedValue({
+      category: 'BILLING', priority: 'URGENT', reasoning: '',
+    })
+    const user = userEvent.setup()
+    render(<ActionButtons ticket={makeTicket()} onUpdate={onUpdate} />)
+
+    await user.click(screen.getByTitle(/sugerir categoria e prioridade/i))
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('URGENT')).toBeInTheDocument()
+      expect(screen.getByDisplayValue('BILLING')).toBeInTheDocument()
+    })
+  })
+
+  it('displays AI reasoning text after suggest', async () => {
+    vi.mocked(suggestClassify).mockResolvedValue({
+      category: 'BUG', priority: 'HIGH', reasoning: 'Clear crash in login flow',
+    })
+    const user = userEvent.setup()
+    render(<ActionButtons ticket={makeTicket()} onUpdate={onUpdate} />)
+
+    await user.click(screen.getByTitle(/sugerir categoria e prioridade/i))
+
+    await waitFor(() => {
+      expect(screen.getByText(/Clear crash in login flow/)).toBeInTheDocument()
+    })
+  })
+
+  it('shows loading indicator while suggest is in progress', async () => {
+    let resolveSuggest: (v: { category: string; priority: string; reasoning: string }) => void
+    vi.mocked(suggestClassify).mockReturnValue(
+      new Promise(r => { resolveSuggest = r })
+    )
+    const user = userEvent.setup()
+    render(<ActionButtons ticket={makeTicket()} onUpdate={onUpdate} />)
+
+    await user.click(screen.getByTitle(/sugerir categoria e prioridade/i))
+
+    expect(screen.getByText('Sugerindo...')).toBeInTheDocument()
+
+    await act(async () => {
+      resolveSuggest!({ category: 'OTHER', priority: 'LOW', reasoning: '' })
+    })
+  })
+
+  it('shows error message when suggestClassify fails', async () => {
+    vi.mocked(suggestClassify).mockRejectedValue(new Error('AI suggestion unavailable'))
+    const user = userEvent.setup()
+    render(<ActionButtons ticket={makeTicket()} onUpdate={onUpdate} />)
+
+    await user.click(screen.getByTitle(/sugerir categoria e prioridade/i))
+
+    await waitFor(() => {
+      expect(screen.getByText('AI suggestion unavailable')).toBeInTheDocument()
+    })
+  })
+
+  it('clears reasoning banner when Classify is clicked manually after suggest', async () => {
+    vi.mocked(suggestClassify).mockResolvedValue({
+      category: 'BUG', priority: 'HIGH', reasoning: 'Should disappear on classify',
+    })
+    vi.mocked(classifyTicket).mockResolvedValue(
+      makeTicket({ category: 'BUG', priority: 'HIGH' })
+    )
+    const user = userEvent.setup()
+    render(<ActionButtons ticket={makeTicket()} onUpdate={onUpdate} />)
+
+    await user.click(screen.getByTitle(/sugerir categoria e prioridade/i))
+    await waitFor(() => {
+      expect(screen.getByText(/Should disappear on classify/)).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Classify' }))
+    await waitFor(() => {
+      expect(screen.queryByText(/Should disappear on classify/)).not.toBeInTheDocument()
     })
   })
 })
