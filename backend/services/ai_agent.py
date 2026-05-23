@@ -390,7 +390,8 @@ def _execute_tool(name: str, args: dict) -> str:
 def run_agent(
     conversation_history: list[dict],
     user_message: str,
-    confirmed_tool_call: dict | None = None
+    confirmed_tool_call: dict | None = None,
+    date_context: dict | None = None,
 ) -> dict:
     """
     Run one turn of the agent.
@@ -404,8 +405,19 @@ def run_agent(
 
     confirmed_tool_call: if the frontend confirmed a pending write action,
     pass {"name": "...", "args": {...}} here to execute it immediately.
+    date_context: {"created_after": "YYYY-MM-DD", "created_before": "YYYY-MM-DD"} from the UI filter.
     """
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    system_content = SYSTEM_PROMPT
+    if date_context:
+        after = date_context.get("created_after", "")
+        before = date_context.get("created_before", "")
+        if after or before:
+            system_content += (
+                f"\n\nActive date filter in the leader's UI: {after} to {before}. "
+                "When the leader does not specify a date range, use these dates as the default "
+                "created_after/created_before for list_tickets calls."
+            )
+    messages = [{"role": "system", "content": system_content}]
     messages.extend(conversation_history)
 
     if confirmed_tool_call:

@@ -164,7 +164,8 @@ export interface AgentStat {
 export async function sendAgentMessage(
   message: string,
   history: AgentHistoryEntry[],
-  confirmedAction?: AgentPendingAction | null
+  confirmedAction?: AgentPendingAction | null,
+  dateContext?: { created_after?: string; created_before?: string } | null
 ): Promise<{ reply: string; pending_action: AgentPendingAction | null; updated_history: AgentHistoryEntry[] }> {
   const res = await fetch(`${BASE}/agent/chat`, {
     method: 'POST',
@@ -173,6 +174,7 @@ export async function sendAgentMessage(
       message,
       history,
       confirmed_action: confirmedAction ?? null,
+      date_context: dateContext ?? null,
     }),
   })
   if (!res.ok) throw new Error(await res.text())

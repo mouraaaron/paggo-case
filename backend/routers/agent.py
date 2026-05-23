@@ -8,6 +8,7 @@ class ChatRequest(BaseModel):
     message: str
     history: list[dict] = []
     confirmed_action: dict | None = None
+    date_context: dict | None = None
 
 class ChatResponse(BaseModel):
     reply: str
@@ -17,7 +18,7 @@ class ChatResponse(BaseModel):
 @router.post("/chat", response_model=ChatResponse)
 def chat(req: ChatRequest):
     try:
-        result = run_agent(req.history, req.message, req.confirmed_action)
+        result = run_agent(req.history, req.message, req.confirmed_action, req.date_context)
         return ChatResponse(**result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

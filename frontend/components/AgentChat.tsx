@@ -30,11 +30,19 @@ export default function AgentChat() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
+  const [dateContext, setDateContext] = useState<{ created_after?: string; created_before?: string } | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, pendingAction])
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('paggo_date_context')
+      if (raw) setDateContext(JSON.parse(raw))
+    } catch { /* ignore */ }
+  }, [])
 
   async function handleSend() {
     const text = input.trim()
@@ -46,7 +54,7 @@ export default function AgentChat() {
     setLoading(true)
 
     try {
-      const res = await sendAgentMessage(text, history, null)
+      const res = await sendAgentMessage(text, history, null, dateContext)
       setHistory(res.updated_history as HistoryEntry[])
       setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'assistant', content: res.reply }])
       if (res.pending_action) {
@@ -70,7 +78,7 @@ export default function AgentChat() {
     setPendingAction(null)
 
     try {
-      const res = await sendAgentMessage(CONFIRM_SIGNAL, history, actionToConfirm)
+      const res = await sendAgentMessage(CONFIRM_SIGNAL, history, actionToConfirm, dateContext)
       setHistory(res.updated_history as HistoryEntry[])
       setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'assistant', content: res.reply }])
       if (res.pending_action) {
@@ -103,8 +111,15 @@ export default function AgentChat() {
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="bg-brand-surface border-b border-brand-border px-4 py-3 flex-shrink-0">
-        <h1 className="text-base font-bold text-white">Assistente de Triagem</h1>
-        <p className="text-xs text-brand-muted">Pergunte sobre tickets, atribuições, status e classificações.</p>
+        <div className="flex items-center gap-3">
+          <h1 className="text-base font-bold text-white">Assistente de Triagem</h1>
+          {dateContext?.created_after && (
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-brand-green/10 border border-brand-green/30 text-brand-green">
+              {dateContext.created_after} → {dateContext.created_before ?? '…'}
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-brand-muted mt-0.5">Pergunte sobre tickets, atribuições, status e classificações.</p>
       </div>
 
       {/* Messages area */}

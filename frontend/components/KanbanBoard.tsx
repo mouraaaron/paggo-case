@@ -133,6 +133,11 @@ export function KanbanBoard() {
     return () => clearTimeout(timer)
   }, [loadColumns])
 
+  useEffect(() => {
+    const ctx = { created_after: filters.created_after, created_before: filters.created_before }
+    localStorage.setItem('paggo_date_context', JSON.stringify(ctx))
+  }, [filters.created_after, filters.created_before])
+
   function setFilter(key: keyof GlobalFilters, value: string) {
     setFilters(f => ({ ...f, [key]: value || undefined }))
   }
