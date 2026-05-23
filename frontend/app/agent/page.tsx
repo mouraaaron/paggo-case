@@ -1,9 +1,12 @@
 import AgentChat from '@/components/AgentChat'
+import { AuthGuard } from '@/components/AuthGuard'
 
 export default function AgentPage() {
   return (
-    <div className="h-screen flex flex-col">
-      <AgentChat />
-    </div>
+    <AuthGuard>
+      <div className="h-screen flex flex-col">
+        <AgentChat />
+      </div>
+    </AuthGuard>
   )
 }
