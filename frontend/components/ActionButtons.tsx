@@ -48,7 +48,14 @@ const CATEGORY_OPTIONS: Exclude<TicketCategory, null>[] = [
   'OTHER',
 ]
 
-const CLOSE_REASON_OPTIONS = ['RESOLVED', 'DUPLICATE', 'SPAM', 'NO_RESPONSE']
+const CLOSE_REASON_OPTIONS = [
+  'RESOLVED_FIXED',
+  'RESOLVED_INFO',
+  'DUPLICATE',
+  'NOT_REPRODUCIBLE',
+  'WONT_FIX',
+  'CUSTOMER_NO_RESPONSE',
+]
 
 interface ActionButtonsProps {
   ticket: Ticket

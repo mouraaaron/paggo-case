@@ -142,6 +142,22 @@ describe('ActionButtons — AI Agent reply', () => {
   })
 })
 
+describe('ActionButtons — Close reason options', () => {
+  it('renders spec-correct close reason options and excludes SPAM', () => {
+    const ticket = makeTicket({ status: 'RESOLVED' })
+    render(<ActionButtons ticket={ticket} onUpdate={vi.fn()} />)
+
+    expect(screen.getByRole('option', { name: 'RESOLVED_FIXED' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'RESOLVED_INFO' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'DUPLICATE' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'NOT_REPRODUCIBLE' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'WONT_FIX' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'CUSTOMER_NO_RESPONSE' })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'SPAM' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'NO_RESPONSE' })).not.toBeInTheDocument()
+  })
+})
+
 describe('ActionButtons — Assign agent', () => {
   const onUpdate = vi.fn()
 
