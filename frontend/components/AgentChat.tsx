@@ -22,19 +22,44 @@ interface HistoryEntry {
   tool_call_id?: string;
 }
 
-export default function AgentChat() {
-  const CONFIRM_SIGNAL = ''; // backend ignores message when confirmed_action is set
+interface SessionData {
+  messages: DisplayMessage[];
+  history: HistoryEntry[];
+  pendingAction: PendingAction | null;
+}
 
-  const [messages, setMessages] = useState<DisplayMessage[]>([])
-  const [history, setHistory] = useState<HistoryEntry[]>([])
+const SESSION_KEY = 'paggo_agent_session'
+
+function readSession(): SessionData | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY)
+    if (raw) return JSON.parse(raw) as SessionData
+  } catch { /* ignore */ }
+  return null
+}
+
+export default function AgentChat() {
+  const CONFIRM_SIGNAL = ''
+
+  const [messages, setMessages] = useState<DisplayMessage[]>(
+    () => readSession()?.messages ?? []
+  )
+  const [history, setHistory] = useState<HistoryEntry[]>(
+    () => readSession()?.history ?? []
+  )
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(
+    () => readSession()?.pendingAction ?? null
+  )
   const [dateContext, setDateContext] = useState<{ created_after?: string; created_before?: string } | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (bottomRef.current && typeof bottomRef.current.scrollIntoView === 'function') {
+      bottomRef.current.scrollIntoView({ behavior: 'smooth' })
+    }
   }, [messages, pendingAction])
 
   useEffect(() => {
@@ -43,6 +68,26 @@ export default function AgentChat() {
       if (raw) setDateContext(JSON.parse(raw))
     } catch { /* ignore */ }
   }, [])
+
+  // Persist conversation to sessionStorage on every state change
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      if (messages.length === 0 && history.length === 0 && pendingAction === null) {
+        sessionStorage.removeItem(SESSION_KEY)
+      } else {
+        const data: SessionData = { messages, history, pendingAction }
+        sessionStorage.setItem(SESSION_KEY, JSON.stringify(data))
+      }
+    } catch { /* ignore */ }
+  }, [messages, history, pendingAction])
+
+  function handleNewConversation() {
+    if (typeof window !== 'undefined') sessionStorage.removeItem(SESSION_KEY)
+    setMessages([])
+    setHistory([])
+    setPendingAction(null)
+  }
 
   async function handleSend() {
     const text = input.trim()
@@ -111,12 +156,23 @@ export default function AgentChat() {
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="bg-brand-surface border-b border-brand-border px-4 py-3 flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <h1 className="text-base font-bold text-white">Assistente de Triagem</h1>
-          {dateContext?.created_after && (
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-brand-green/10 border border-brand-green/30 text-brand-green">
-              {dateContext.created_after} → {dateContext.created_before ?? '…'}
-            </span>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <h1 className="text-base font-bold text-white">Assistente de Triagem</h1>
+            {dateContext?.created_after && (
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-brand-green/10 border border-brand-green/30 text-brand-green">
+                {dateContext.created_after} → {dateContext.created_before ?? '…'}
+              </span>
+            )}
+          </div>
+          {messages.length > 0 && (
+            <button
+              onClick={handleNewConversation}
+              disabled={loading}
+              className="text-[10px] font-medium text-brand-muted hover:text-white border border-brand-border hover:border-white rounded-lg px-2 py-1 transition-colors disabled:opacity-40 cursor-pointer"
+            >
+              Nova conversa
+            </button>
           )}
         </div>
         <p className="text-xs text-brand-muted mt-0.5">Pergunte sobre tickets, atribuições, status e classificações.</p>
